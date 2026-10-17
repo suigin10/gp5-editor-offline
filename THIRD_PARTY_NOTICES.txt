@@ -1,0 +1,22 @@
+Original GP5 Editor: rvalladares
+Bluetooth: https://rvalladares.com/gp5/gp5editor/
+USB: https://rvalladares.com/gp5/gp5editor/usb.html
+Retrieved: 2026-10-17
+
+Thank you to rvalladares for developing and sharing GP5 Editor.
+Please remember the original developer and consider supporting their work (optional):
+https://www.buymeacoffee.com/rvalladares
+
+This is an unofficial desktop port, not endorsed by the original developer or Valeton.
+No editor-wide modification/redistribution license was found on the retrieved pages.
+Original rights are retained. Attribution and donation do not grant redistribution rights.
+Confirm the original developer's terms before public or third-party distribution.
+
+Changes in this port: Electron wrapper, GP-5-only UI, local assets,
+USB/Bluetooth selector, version branding, and a new application icon.
+The original website icon and donation banner are not included in the application.
+
+Bootstrap v5.3.8: Copyright 2011-2025 The Bootstrap Authors.
+MIT License: BOOTSTRAP-LICENSE.txt (unaltered).
+Electron: LICENSE (unaltered). Chromium: LICENSES.chromium.html (unaltered).
+These dependency licenses do not relicense the original editor.

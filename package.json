@@ -1,0 +1,19 @@
+{
+  "name": "gp5-offline-desktop",
+  "version": "0.1.2",
+  "description": "Offline USB/Bluetooth desktop port of rvalladares GP5 Editor",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke-test",
+    "package": "node scripts/package.mjs",
+    "brand": "node scripts/sync-branding.cjs",
+    "prestart": "npm run brand",
+    "prepackage": "npm run brand"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.9.0"
+  }
+}
