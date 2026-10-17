@@ -1,0 +1,17 @@
+{
+  "retrieved": "2026-10-18",
+  "author": "rvalladares",
+  "license_status": "No editor-wide modification/redistribution license found; original rights unchanged",
+  "files": [
+    {
+      "file": "gp50-usb.html",
+      "url": "https://rvalladares.com/gp5/gp50editor/usb.html",
+      "sha256": "7884b742a2a7dd7e115ecdb98fbfa5abd04cd0284331bbb7b2cf9f27d7532706"
+    },
+    {
+      "file": "gp50-bluetooth.html",
+      "url": "https://rvalladares.com/gp5/gp50editor/",
+      "sha256": "11bc519e7bff7e12c2f547a01682970b0312a0e2f7e388ad4e91dddd2737c629"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, session, ipcMain, shell } = require('electron');
 const crypto = require('node:crypto');
 const presetCodec = require('./app/preset-codec.js');
+const profiles = require('./app/device-profiles.js');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -8,7 +9,7 @@ const installBluetoothPicker = require('./bluetooth.cjs');
 
 const smoke = process.argv.includes('--smoke-test');
 const appVersion = app.getVersion();
-const appTitle = `GP5 Editor Offline — v${appVersion}`;
+const appTitle = `GP Editor Offline — v${appVersion}`;
 const entry = path.join(__dirname, 'app', 'index.html');
 const entryURL = pathToFileURL(entry).href;
 const bluetoothEntry = path.join(__dirname, 'app', 'bluetooth.html');
@@ -17,6 +18,8 @@ const smokeDir = process.env.GP5_SMOKE_DIR || path.join(__dirname, 'smoke');
 let win;
 let bluetoothPicker;
 let mode = 'usb';
+let model = 'gp5';
+const routes = Object.fromEntries(Object.values(profiles.PROFILES).flatMap(p => ['usb','bluetooth'].map(transport => [pathToFileURL(path.join(__dirname,'app',p[transport])).href, { model:p.key, transport }])));
 let smokeDownloadDone;
 let smokeRejectBackup = false;
 const failures = [];
@@ -30,31 +33,31 @@ if (smoke) {
 app.setAppUserModelId('local.gp5.editor.offline');
 
 function isEditor(contents) {
-  return contents && contents === win?.webContents && [entryURL, bluetoothURL].includes(contents.getURL().split('#')[0]);
+  return contents && contents === win?.webContents && !!routes[contents.getURL().split('#')[0]];
 }
 
-async function switchMode(next) {
-  if (mode === next) return;
-  if (await win.webContents.executeJavaScript('!!window.GP5Patches?.busy')) return;
+function updateChecks() {
+  const menu = Menu.getApplicationMenu();
+  for (const key of ['usb','bluetooth']) menu?.getMenuItemById('mode-'+key) && (menu.getMenuItemById('mode-'+key).checked = mode === key);
+  for (const key of ['gp5','gp50']) menu?.getMenuItemById('model-'+key) && (menu.getMenuItemById('model-'+key).checked = model === key);
+}
+async function switchMode(next) { return switchEditor(model,next); }
+async function switchEditor(nextModel,nextMode) {
+  if (model === nextModel && mode === nextMode) { updateChecks(); return; }
+  if (await win.webContents.executeJavaScript('!!window.GP5Patches?.busy')) { updateChecks(); return; }
   const connected = await win.webContents.executeJavaScript(mode === 'usb'
     ? 'typeof inputPort !== "undefined" && inputPort !== null'
     : 'typeof device !== "undefined" && !!device?.gatt?.connected');
   if (connected) {
-    const { response } = await dialog.showMessageBox(win, { type: 'question',
-      buttons: ['切り替える', 'キャンセル'], defaultId: 1, cancelId: 1,
-      message: '接続方式を切り替えますか？', detail: '現在の接続を終了します。必要なパッチ保存は先に行ってください。' });
-    if (response !== 0) {
-      Menu.getApplicationMenu().getMenuItemById('mode-usb').checked = mode === 'usb';
-      Menu.getApplicationMenu().getMenuItemById('mode-bluetooth').checked = mode === 'bluetooth';
-      return;
-    }
+    const { response } = await dialog.showMessageBox(win, { type:'question',buttons:['切り替える','キャンセル'],defaultId:1,cancelId:1,
+      message:'機種・接続方式を切り替えますか？',detail:'現在の接続を終了します。必要なパッチ保存は先に行ってください。' });
+    if (response !== 0) { updateChecks(); return; }
     await win.webContents.executeJavaScript('gui.btn_disconnect.onclick()');
   }
   bluetoothPicker.cancel();
-  mode = next;
-  await win.loadFile(mode === 'usb' ? entry : bluetoothEntry);
-  Menu.getApplicationMenu().getMenuItemById('mode-usb').checked = mode === 'usb';
-  Menu.getApplicationMenu().getMenuItemById('mode-bluetooth').checked = mode === 'bluetooth';
+  model = profiles.get(nextModel).key; mode = nextMode;
+  await win.loadFile(path.join(__dirname,'app',profiles.get(model)[mode]));
+  updateChecks();
 }
 
 app.whenReady().then(async () => {
@@ -74,7 +77,7 @@ app.whenReady().then(async () => {
     const name = path.basename(item.getFilename()).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
     if (smoke) item.setSavePath(path.join(smokeDir, 'synthetic.prst'));
     else item.setSaveDialogOptions({
-      title: 'Save GP-5 preset',
+      title: 'Save GP preset',
       defaultPath: path.join(app.getPath('downloads'), name),
       filters: [{ name: 'GP preset', extensions: ['prst'] }]
     });
@@ -94,8 +97,8 @@ app.whenReady().then(async () => {
   const backupDir = path.join(app.getPath('userData'), 'patch-backups');
   const checked = (event, bytes) => {
     if (!isEditor(event.sender)) throw Error('Invalid editor');
-    if (!Array.isArray(bytes) || bytes.length !== 507 || bytes.some(b => !Number.isInteger(b) || b < 0 || b > 255)) throw Error('Invalid preset');
-    return Buffer.from(presetCodec.parse(bytes).bytes);
+    if (!Array.isArray(bytes) || ![507,552].includes(bytes.length) || bytes.some(b => !Number.isInteger(b) || b < 0 || b > 255)) throw Error('Invalid preset');
+    return Buffer.from(presetCodec.parse(bytes, model).bytes);
   };
   const safeName = value => String(value || 'GP5').replace(/[^A-Za-z0-9 _.-]/g, '_').slice(0, 80).replace(/[. ]+$/, '') || 'GP5';
   function atomicSave(filename, bytes) {
@@ -108,29 +111,29 @@ app.whenReady().then(async () => {
   }
   ipcMain.handle('gp5-file-save', async (event, bytes, name) => {
     const data = checked(event, bytes);
-    if (smoke) { atomicSave(path.join(smokeDir, `pc-${mode}.prst`), data); return `pc-${mode}.prst`; }
+    if (smoke) { atomicSave(path.join(smokeDir, `pc-${model}-${mode}.prst`), data); return `pc-${model}-${mode}.prst`; }
     const result = await dialog.showSaveDialog(win, { title: 'パッチをPCに保存',
       defaultPath: path.join(app.getPath('documents'), `${safeName(name)}.prst`),
-      filters: [{ name: 'GP-5 preset', extensions: ['prst'] }] });
+      filters: [{ name: 'GP-5 / GP-50 preset', extensions: ['prst'] }] });
     if (result.canceled) return null;
     atomicSave(result.filePath, data);
     return path.basename(result.filePath);
   });
   ipcMain.handle('gp5-file-open', async event => {
     if (!isEditor(event.sender)) throw Error('Invalid editor');
-    const result = await dialog.showOpenDialog(win, { title: 'GP-5パッチをPCから読み込み', properties: ['openFile'],
-      filters: [{ name: 'GP-5 preset', extensions: ['prst'] }] });
+    const result = await dialog.showOpenDialog(win, { title: `${profiles.get(model).name}パッチをPCから読み込み`, properties: ['openFile'],
+      filters: [{ name: 'GP-5 / GP-50 preset', extensions: ['prst'] }] });
     if (result.canceled) return null;
     const filename = result.filePaths[0];
-    if (fs.statSync(filename).size !== 507) throw Error('GP-5用の507バイトの.prstファイルを選択してください。');
-    const bytes = presetCodec.parse(fs.readFileSync(filename)).bytes;
+    if (![507,552].includes(fs.statSync(filename).size)) throw Error('GP-5 / GP-50用の.prstを選択してください。');
+    const bytes = presetCodec.parse(fs.readFileSync(filename), model).bytes;
     return { name: path.basename(filename), bytes: Array.from(bytes) };
   });
   ipcMain.handle('gp5-file-backup', (event, bytes, label) => {
     const data = checked(event, bytes);
     if (smoke && smokeRejectBackup) throw Error('テスト用: バックアップ保存失敗');
     fs.mkdirSync(backupDir, { recursive: true });
-    const name = `${new Date().toISOString().replace(/[:.]/g, '-')}-${safeName(label)}-${crypto.randomUUID().slice(0,8)}.prst`;
+    const name = `${new Date().toISOString().replace(/[:.]/g, '-')}-${model}-${safeName(label)}-${crypto.randomUUID().slice(0,8)}.prst`;
     const filename = path.join(backupDir, name);
     fs.writeFileSync(filename, data, { flag: 'wx' });
     if (!fs.readFileSync(filename).equals(data)) throw Error('バックアップを確認できません。処理を中止しました。');
@@ -145,8 +148,8 @@ app.whenReady().then(async () => {
   win.webContents.on('will-navigate', (event, url) => {
     if (url.split('#')[0] === win.webContents.getURL().split('#')[0]) return;
     event.preventDefault();
-    if (url.split('#')[0] === entryURL) switchMode('usb').catch(console.error);
-    if (url.split('#')[0] === bluetoothURL) switchMode('bluetooth').catch(console.error);
+    const route = routes[url.split('#')[0]];
+    if (route) switchEditor(route.model,route.transport).catch(console.error);
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('console-message', details => {
@@ -157,15 +160,19 @@ app.whenReady().then(async () => {
 
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'File', submenu: [{ role: 'close' }] },
+    { label: 'Device', submenu: [
+      { id:'model-gp5',label:'GP-5',type:'radio',checked:true,click:()=>switchEditor('gp5',mode).catch(console.error) },
+      { id:'model-gp50',label:'GP-50',type:'radio',click:()=>switchEditor('gp50',mode).catch(console.error) }
+    ] },
     { label: 'Connection', submenu: [
       { id: 'mode-usb', label: 'USB', type: 'radio', checked: true, click: () => switchMode('usb').catch(console.error) },
       { id: 'mode-bluetooth', label: 'Bluetooth', type: 'radio', click: () => switchMode('bluetooth').catch(console.error) }
     ] },
     { label: 'View', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }] },
-    { label: 'GP-5', submenu: [{ label: 'About GP5 Editor', click: () => dialog.showMessageBox(win, {
+    { label: 'GP-5 / GP-50', submenu: [{ label: 'About GP Editor', click: () => dialog.showMessageBox(win, {
       type: 'info', title: appTitle,
       message: `${appTitle} (USB / Bluetooth)`,
-      detail: 'Based on GP5 Editor by rvalladares.\n原作者rvalladares氏の開発・公開に感謝します。\nこのアプリが役に立ったら、原作者への寄付もぜひご検討ください（任意）。\n\nOriginal: https://rvalladares.com/gp5/gp5editor/\nSupport the original developer: https://www.buymeacoffee.com/rvalladares\n\n非公式のWindows移植版です。原作の再配布条件は未確認です。READMEと謝辞をご確認ください。'
+      detail: 'Based on GP5 Editor and GP50 Editor by rvalladares.\n原作者rvalladares氏の開発・公開に感謝します。\nこのアプリが役に立ったら、原作者への寄付もぜひご検討ください（任意）。\n\nOriginal: https://rvalladares.com/gp5/gp5editor/\nSupport the original developer: https://www.buymeacoffee.com/rvalladares\n\nGP-5 / GP-50対応の非公式Windows移植版です。出典と権利表示はREADMEと謝辞をご確認ください。'
     }) }] }
   ]));
 
@@ -205,7 +212,7 @@ app.whenReady().then(async () => {
     usb.presetDownloadState = completed;
     usb.presetDownloadPassed = completed === 'completed' && fs.readFileSync(path.join(smokeDir, 'synthetic.prst')).equals(Buffer.from([71,80,45,53,0]));
     const patchTests = process.env.GP5_PATCH_TEST_ROOT ? require(path.join(process.env.GP5_PATCH_TEST_ROOT, 'scripts/patch-smoke.cjs')) : null;
-    if (patchTests) usb.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
+    if (patchTests) usb.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, model, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
     fs.writeFileSync(path.join(smokeDir, 'usb-window.png'), (await win.webContents.capturePage()).toPNG());
     await switchMode('bluetooth');
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -223,7 +230,7 @@ app.whenReady().then(async () => {
       result.adapterAvailable = await navigator.bluetooth.getAvailability();
       return result;
     })()`);
-    if (patchTests) bluetooth.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
+    if (patchTests) bluetooth.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, model, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
     fs.writeFileSync(path.join(smokeDir, 'bluetooth-window.png'), (await win.webContents.capturePage()).toPNG());
     // Exercise our native BLE picker using synthetic discovery results only.
     const { BrowserWindow: BW, ipcMain } = require('electron');
@@ -236,19 +243,27 @@ app.whenReady().then(async () => {
     const pickerHasDevice = await picker.webContents.executeJavaScript('document.getElementById("devices").textContent.includes("GP-5 (simulated)")');
     ipcMain.emit('gp5-ble-select', { sender: picker.webContents }, 'SMOKE-NOT-A-REAL-DEVICE');
     bluetooth.pickerSelectPassed = pickerHasDevice && selected === 'SMOKE-NOT-A-REAL-DEVICE';
-    await switchMode('usb');
-    const report = { usb, bluetooth, sandboxDisabledForTest: app.commandLine.hasSwitch('no-sandbox') };
+    const gp50 = {};
+    if (patchTests) for (const transport of ['usb','bluetooth']) {
+      await switchEditor('gp50',transport);
+      await new Promise(resolve => setTimeout(resolve,200));
+      gp50[transport] = await patchTests(win, { root:process.env.GP5_PATCH_TEST_ROOT,mode,model,smokeDir,backupDir,rejectBackup:value=>{smokeRejectBackup=value;} });
+      await new Promise(resolve => setTimeout(resolve,50));
+      fs.writeFileSync(path.join(smokeDir,`gp50-${transport}-window.png`),(await win.webContents.capturePage()).toPNG());
+    }
+    await switchEditor('gp5','usb');
+    const report = { usb, bluetooth, gp50, sandboxDisabledForTest: app.commandLine.hasSwitch('no-sandbox') };
     // The deliberate offline probe emits a console error; retain other errors.
     report.errors = failures.filter(e => !e.includes('Content Security Policy') && !e.includes('violates the following') && !e.includes('https://example.com/offline-probe'));
     report.blockedRequests = blockedRequests;
     const passed = usb.secureContext && usb.hasWebMIDI && usb.sysexEnabled && !usb.nodeExposed && usb.remoteBlocked && usb.imagesComplete && usb.initialInputPort && usb.initialOutputPort && usb.presetDownloadPassed && usb.gp5OnlyUI && usb.activeMode === 'USB' && Object.values(usb.controls).every(Boolean) && bluetooth.hasWebBluetooth && bluetooth.secureContext && !bluetooth.connected && !bluetooth.nodeExposed && bluetooth.imagesComplete && bluetooth.pickerSelectPassed && bluetooth.gp5OnlyUI && bluetooth.activeMode === 'Bluetooth' && !report.errors.length;
-    report.passed = passed && [usb, bluetooth].every(r => r.appVersion === appVersion && r.title.includes(`v${appVersion}`) && r.favicon === 'assets/app-icon.png');
+    report.passed = passed && (!patchTests || Object.values(gp50).length === 2 && Object.values(gp50).every(r=>r.passed)) && [usb, bluetooth].every(r => r.appVersion === appVersion && r.title.includes(`v${appVersion}`) && r.favicon === 'assets/app-icon.png');
     fs.writeFileSync(path.join(smokeDir, 'report.json'), JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));
     app.exit(report.passed ? 0 : 1);
   }
 }).catch(err => {
   if (smoke) { console.error(err); app.exit(1); }
-  else { dialog.showErrorBox('GP5 Editor', String(err)); app.quit(); }
+  else { dialog.showErrorBox('GP Editor Offline', String(err)); app.quit(); }
 });
 app.on('window-all-closed', () => app.quit());

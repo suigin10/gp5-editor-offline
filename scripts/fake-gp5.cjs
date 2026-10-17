@@ -18,6 +18,11 @@
       }
     }
     send(wire) {
+      if (wire[0] === 0xc0 && wire.length === 2) {
+        this.sent.push({ short:Array.from(wire) });
+        if(wire[1] !== this.current) { this.current=wire[1]; this.ram=this.flash[this.current].slice(41); }
+        return;
+      }
       const frame = C.decode(wire);
       if (!frame) throw Error('Test received corrupt frame');
       this.sent.push(frame);
@@ -29,7 +34,7 @@
         if (this.incoming.length === frame.total) {
           const data = Uint8Array.from(this.incoming.flatMap(v => Array.from(v)));
           if (data[0] !== 17 || data[1] !== 79) throw Error('Forbidden test opcode');
-          this.flash[data[2]] = C.build(C.readName(data.slice(6,16)), data.slice(22));
+          this.flash[data[2]] = C.build(C.readName(data.slice(6,22)), data.slice(22));
           this.writes++; this.incoming = [];
         }
         this.reply([20,8,0]); return;

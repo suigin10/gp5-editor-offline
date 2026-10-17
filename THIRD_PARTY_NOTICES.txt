@@ -10,9 +10,8 @@ https://www.buymeacoffee.com/rvalladares
 This is an unofficial desktop port, not endorsed by the original developer or Valeton.
 No editor-wide modification/redistribution license was found on the retrieved pages.
 Original rights are retained. Attribution and donation do not grant redistribution rights.
-Confirm the original developer's terms before public or third-party distribution.
 
-Changes in this port: Electron wrapper, GP-5-only UI, local assets,
+Changes in this port: Electron wrapper, GP-5 / GP-50 model selection, local assets,
 USB/Bluetooth selector, version branding, and a new application icon.
 The original website icon and donation banner are not included in the application.
 
@@ -27,3 +26,10 @@ https://github.com/fsanchezlme97-ui/gp5-editor
 https://github.com/drewmerc302/valeton-gp50
 MIT notices: COMMUNITY-PROTOCOL-LICENSE.txt. Details: PROTOCOL_SOURCES.md.
 These notices do not change the original rvalladares editor rights.
+
+
+0.3.0 adds rvalladares GP50 Editor USB/Bluetooth pages:
+https://rvalladares.com/gp5/gp50editor/
+Archived provenance: upstream/GP50-ORIGIN.json. Original editor rights are unchanged.
+GP-50 capture vectors: drewmerc302/valeton-gp50 patch/decode_import_capture.py (MIT, Andrew Mercurio).
+VLTN Tone Studio is GPL-3.0; consulted for protocol facts and verification status only, no code copied in this release. See FEATURE_REVIEW.md.

@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.3.0 — 2026-10-18
+
+- GP-5 / GP-50の機種選択、GP-50 USB / Bluetooth画面を復元
+- GP-50の552バイト.prst、511バイトの読出し、29フレーム転送とProgram Changeによる選択に対応
+- 機種の厳密な識別、異機種ファイルの送信拒否、FS/EXPデータ保持と16文字ファイル名保持
+- GP-50の未検証CTL・テンポ直接変更は無効、IR/SnapTone転送は未追加
+- VLTN Tone Studioの取り込み候補と実機確認事項をFEATURE_REVIEW.mdに整理
+- 原作者の出典・謝意・任意の寄付案内を継続、アプリアイコンをGP共通表記に更新
+
+
 ## 0.2.0 — 2026-10-17
 
 - PCへの.prst保存と読み込み、10文字のリネームを追加（USB/Bluetooth共通）
@@ -28,8 +38,8 @@
 
 ## 原作者への謝意と支援
 
-本アプリは **rvalladares氏のGP5 Editor** を基にした非公式のWindows移植版です。
-GP-5のエディターを開発・公開してくださった原作者に、心より感謝します。
+本アプリは **rvalladares氏のGP5 Editor / GP50 Editor** を基にした非公式のWindows移植版です。
+GP-5 / GP-50のエディターを開発・公開してくださった原作者に、心より感謝します。
 便利に使えたときは、原作者への感謝と寄付による支援も、ぜひお忘れなく（寄付は任意です）。
 
 - 原作・Bluetooth版: https://rvalladares.com/gp5/gp5editor/

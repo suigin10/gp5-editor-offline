@@ -35,7 +35,8 @@ function exportBytes(html, fixture) {
 for (const [original, local] of [['usb.html', 'index.html'], ['bluetooth.html', 'bluetooth.html']]) {
   const upstream = fs.readFileSync(path.join(root, 'upstream', original), 'utf8');
   const current = fs.readFileSync(path.join(root, 'app', local), 'utf8');
-  assert(!/gp.?50|helpModal|buymeacoffee|Virtual Midi|preset Converter/i.test(current));
+  assert(current.includes('data-device="gp5"'));
+  assert(!/helpModal|buymeacoffee|Virtual Midi|preset Converter/i.test(current));
   for (let slot of [0, 49, 99]) {
     const fixture = { slot, names: Array.from({ length: 100 }, (_, i) => `Patch ${String(i).padStart(4, '0')}`),
       data: [Array.from({ length: 400 }, (_, i) => (i * 7 + slot) % 16)] };
@@ -44,5 +45,5 @@ for (const [original, local] of [['usb.html', 'index.html'], ['bluetooth.html', 
   }
   const script = current.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)[1];
   new vm.Script(script, { filename: local });
-  console.log(`${local}: GP-5-only UI, syntax, original preset bytes verified (patches 0, 49, 99).`);
+  console.log(`${local}: GP-5 page, syntax, original preset bytes verified (patches 0, 49, 99).`);
 }

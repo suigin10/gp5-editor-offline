@@ -17,7 +17,7 @@ if (cached) {
 const result = await packager({
   dir: root, name: 'GP5 Editor Offline', executableName: 'GP5-Editor-Offline',
   platform: 'win32', arch: 'x64', appVersion: version, electronVersion,
-  win32metadata: { CompanyName: 'Unofficial local port', FileDescription: 'GP-5 USB / Bluetooth Editor' },
+  win32metadata: { CompanyName: 'Unofficial local port', FileDescription: 'GP-5 / GP-50 USB / Bluetooth Editor' },
   icon: path.join(root, 'app/assets/app-icon.ico'),
   electronZipDir: cached,
   out: path.resolve(root, '../../outputs', version), asar: true, overwrite: true,
@@ -25,9 +25,10 @@ const result = await packager({
   download: { cacheRoot }
 });
 for (const output of result) {
-  for (const file of ['README.txt', 'README.md', 'ACKNOWLEDGEMENTS.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.txt', 'DISTRIBUTION.md', 'VALIDATION.md', 'BOOTSTRAP-LICENSE.txt', 'COMMUNITY-PROTOCOL-LICENSE.txt', 'PROTOCOL_SOURCES.md']) {
+  for (const file of ['README.txt', 'README.md', 'ACKNOWLEDGEMENTS.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.txt', 'DISTRIBUTION.md', 'VALIDATION.md', 'BOOTSTRAP-LICENSE.txt', 'COMMUNITY-PROTOCOL-LICENSE.txt', 'PROTOCOL_SOURCES.md', 'FEATURE_REVIEW.md']) {
     fs.copyFileSync(path.join(root, file), path.join(output, file));
   }
   fs.copyFileSync(path.join(root, 'upstream/ORIGIN.json'), path.join(output, 'ORIGIN.json'));
+  fs.copyFileSync(path.join(root, 'upstream/GP50-ORIGIN.json'), path.join(output, 'GP50-ORIGIN.json'));
 }
 console.log(result.join('\n'));

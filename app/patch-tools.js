@@ -2,14 +2,15 @@
 (() => {
   'use strict';
   const C = window.GP5PresetCodec;
-  const ble = location.pathname.endsWith('bluetooth.html');
+  const P = window.GPDevice;
+  const ble = GPTransport === 'bluetooth';
   let busy = false, polling = null, lastEdit = 0, revision = 0, lastBody = null, namesDue = 0, mutated = false;
   const connected = () => ble ? !!device?.gatt?.connected && !!writeChar : !!inputPort && !!outputPort && inputPort.state !== 'disconnected' && outputPort.state !== 'disconnected';
   const session = new GP5PresetSession(async frame => {
-    if (!connected()) throw Error('GP-5が接続されていません。');
+    if (!connected()) throw Error(`${P.name}が接続されていません。`);
     if (ble) await writeChar.writeValueWithoutResponse(Uint8Array.from([128,128,...frame]));
     else outputPort.send(frame);
-  }, ble ? 8000 : 4000);
+  }, ble ? 8000 : 4000, P.key);
   const row = document.createElement('div');
   row.className = 'd-flex flex-wrap align-items-center gap-2 p-2 border-bottom';
   row.innerHTML = `<button id="save_pc_patch" class="btn btn-outline-info btn-sm lockable" disabled>PCに保存…</button>
@@ -20,6 +21,29 @@
     <span id="patch_tools_status" class="small text-body-secondary" role="status" aria-live="polite">接続待ち</span>`;
   document.querySelector('.container-fluid > .row').after(row);
   gui.saveGP5Preset.closest('.dropdown').hidden = true;
+  const selector = document.createElement('div');
+  selector.className = 'd-flex gap-2 align-items-center px-2 py-1 border-bottom';
+  selector.innerHTML = '<span class="small">機種</span><nav id="device-model" class="btn-group btn-group-sm" aria-label="Device model"></nav><span class="small text-body-secondary" id="device-note"></span>';
+  for (const profile of Object.values(GPProfiles.PROFILES)) {
+    const link = document.createElement('a'); link.id = `model-${profile.key}`;
+    link.href = profile[GPTransport]; link.textContent = profile.name;
+    link.className = `btn btn-${profile.key === P.key ? 'primary' : 'outline-secondary'}`;
+    if (profile.key === P.key) link.setAttribute('aria-current','page');
+    selector.querySelector('nav').append(link);
+  }
+  row.before(selector);
+  if (P.key === 'gp50') {
+    selector.querySelector('#device-note').textContent = 'GP-50対応復元版・実機未検証 / CTLとテンポのライブ変更は検証待ち';
+    // Keep unverified GP-50 live footswitch/tempo writes off. The stored bytes are preserved in .prst.
+    const originalDisableGUI = disableGUI;
+    disableGUI = locked => {
+      originalDisableGUI(locked);
+      document.querySelectorAll('.check-ctl, #patch_bpm_value, #btn_tap, #btn_tap_minus, #btn_tap_plus').forEach(control => {
+        control.disabled = true; control.title = 'GP-50での実機検証後に対応予定です';
+      });
+    };
+    sendBPM = sendCTL = () => { status.textContent = 'GP-50のCTL・テンポのライブ変更は検証待ちです'; };
+  }
   gui.btn_save_patch.textContent = '本体に保存';
   const status = document.getElementById('patch_tools_status');
   const autoSync = document.getElementById('auto_patch_sync');
@@ -56,7 +80,7 @@
   }
   async function run(title, action) {
     if (busy) return;
-    if (initialSync || !connected()) { alert('GP-5を接続し、同期が終わってから操作してください。'); return; }
+    if (initialSync || !connected()) { alert(`${P.name}を接続し、同期が終わってから操作してください。`); return; }
     busy = true;
     mutated = false;
     try {
@@ -85,7 +109,7 @@
     if (await session.currentSlot() !== target) throw Error('本体のパッチが変わりました。選択を確認して操作し直してください。');
     const names = await session.names(), body = await session.body();
     if (await session.currentSlot() !== target) throw Error('読み取り中に本体のパッチが変わりました。');
-    return { bytes: C.build(names[target], body), body, names };
+    return { bytes: C.build(names[target], body, P.key), body, names };
   }
   async function backup(bytes, label) {
     const filename = await gp5Files.backup(Array.from(bytes), label);
@@ -113,14 +137,14 @@
     await run('PC保存用のパッチを読み取り中…', async () => {
       const target = currentPatchNumber;
       const current = await snapshot(target);
-      const filename = await gp5Files.save(Array.from(current.bytes), `gp5_${String(target).padStart(2,'0')}-${current.names[target]}`);
+      const filename = await gp5Files.save(Array.from(current.bytes), `${P.key}_${String(target).padStart(2,'0')}-${current.names[target]}`);
       status.textContent = filename ? `PCに保存: ${filename}` : 'PCへの保存をキャンセルしました';
     });
   }
   async function loadPreset(file) {
-    const preset = C.parse(file.bytes);
+    const preset = C.parse(file.bytes, P.key);
     for (let block = 1; block < 10; block++) {
-      const id = C.hex(preset.bytes.slice(131 + block * 4, 135 + block * 4));
+      const id = C.hex(preset.bytes.slice(preset.modelsOffset + block * 4, preset.modelsOffset + 4 + block * 4));
       if (effectsLIST[block][id] === undefined) throw Error(`未対応のエフェクトが含まれています（${blocksLIST[block]}: ${id}）。`);
     }
     // Validation and destination confirmation both precede any device changes.
@@ -145,6 +169,19 @@
       const current = await snapshot(target);
       await commit(current.bytes, target, current);
     });
+  }
+  async function selectGP50(target) {
+    if (patchChanged && !confirm('パッチを切り替えると未保存の編集を破棄します。切り替えますか？')) { gui.listPatches.value = currentPatchNumber; return; }
+    await run('パッチを切り替え中…', async () => {
+      await session.select(target);
+      const names = await session.names(), body = await session.body();
+      showBody(body,target,names,true); status.textContent = '本体と同期済み';
+    });
+  }
+  if (P.key === 'gp50') {
+    gui.listPatches.onchange = () => selectGP50(Number(gui.listPatches.value));
+    gui.btn_previous.onclick = () => selectGP50((currentPatchNumber+99)%100);
+    gui.btn_next.onclick = () => selectGP50((currentPatchNumber+1)%100);
   }
   const renameDialog = document.createElement('dialog');
   let renameTarget = null;
