@@ -1,25 +1,25 @@
-# GP Editor Offline — v0.4.0
+# GP Editor Offline — v0.5.0
 
 Windows 11 x64用の、非公式オフラインGP-5エディターです。USB / Bluetoothに対応します。未確認のGP-50対応は0.4.0で取り除きました。
 
 ## 起動と画面
 
-ZIPをフォルダーごと展開して GP5-Editor-Offline.exe を起動してください。DLL・resources・localesも必要です。ブラウザー、Node.js、管理者権限、ファームウェア更新は不要です。
+ZIPをフォルダーごと展開して GP5-Editor-Offline.exe を起動してください。DLL・resources・locales・converterも必要です。ブラウザー、Node.js、管理者権限、ファームウェア更新は不要です。
 
 Valeton Suiteや他のエディターを終了し、USB / Bluetoothを選んでConnectを押します。BluetoothはGP-5の機器名を選び、スマートフォン等との接続は終了してください。起動だけでは本体へ接続・送信しません。
 
-ウィンドウは画面の作業領域に合わせて開きます。下部の本体保存・設定・切断欄は固定し、狭い画面では中央だけスクロールします。通常画面のTAPはBPMの横へまとめました。
+ウィンドウは画面の作業領域に合わせて開きます。下部の本体保存・設定・切断欄は固定し、中央は表示領域に合わせて縮尺を調整します。標準サイズでは通常画面・Live Viewとも全体表示します。TAPは両画面で押せる範囲を広げました。ファイル一覧などのダイアログ内ではスクロールできます。
 
-Live Viewは演奏用です。大きなパッチ番号・名前、前後切替、エフェクトのON/OFFとTAPを表示します。ファイル操作・音量や設定の細かな編集は通常画面へ戻るかメニューから行います。ON/OFFは文字と色の両方で示します。
+Live Viewは演奏用です。大きなパッチ番号・名前、前後切替、エフェクトのON/OFFとTAPを表示します。ファイル操作・音量や設定の細かな編集は通常画面へ戻るかメニューから行います。エフェクトの状態は点灯・減光で示し、アイコンと操作領域を拡大しています。
 
-NAM / SnapTone有効時は音色名のバナーと、AMP / CABの斜線表示に「SnapTone使用中」を表示します。これはSnapToneが有効という表示で、AMP / CABの実際のスイッチ状態はON/OFF表示で確認します。
+NAM / SnapTone有効時は音色名のバナーと、AMP / CABの斜線表示に「SnapTone使用中」を表示します。これはSnapToneが有効という表示で、AMP / CABの実際のスイッチ状態は点灯・減光で確認します。
 
 ## ファイルメニュー
 
 - パッチをPCに保存（Ctrl+S）／PCから読み込み（Ctrl+O）
 - コピー／別名保存（Ctrl+Shift+S）、本体の名前変更
 - 一括バックアップ、パッチバックアップを開く
-- SnapTone / IR管理、IR WAV／SnapToneファイルの確認、元ファイル保管先
+- SnapTone / IR管理、NAMをSnapToneに変換、IR WAV／SnapToneファイルの確認、元ファイル保管先
 
 通常画面にも主な操作ボタンがあります。バックアップ関連はファイルメニューにまとめています。
 
@@ -52,13 +52,26 @@ IR / SnapTone本体の一括バックアップではありません。
 ファイル確認は接続前でも利用できます。
 
 - IR: 44.1kHz、モノラル／ステレオのPCM16/24/32bitまたはFloat32 WAV。ステレオは平均してモノラル化。先頭512サンプルを24bitへ量子化し、短い場合はゼロ埋め。正規化・リサンプリングは行いません。処理内容・ピーク・SHA-256を表示します。
-- SnapTone: 変換済み2696バイトのVTSIファイル（.clo / .vtsi / .bin）。ヘッダー・形式・CRCを検査します。.namや8840バイトの中間ファイル、NAMからの変換には未対応です。
+- SnapTone: 変換済み2696バイトのVTSIファイル（.clo / .vtsi / .bin）。ヘッダー・形式・CRCを検査します。.namは下記の変換メニューを使います。8840バイトの中間ファイルは転送できません。
 
 本体一覧でユーザー枠を選び、転送名と上書き対象を確認してUSB転送します。転送は実験機能で、本アプリでの動作・音の確認は未実施です。 Bluetoothは一覧とファイル確認に対応し、IR / SnapTone転送は無効です。
 
 転送前に元ファイル、準備済みデータ、機種・枠・名前・ハッシュ・日時を %APPDATA%/gp5-offline-desktop/asset-library/ へ保存します。PC保存に失敗した場合は転送しません。
 
 ACKを1フレームずつ待ち、拒否・応答なしで中断します。自動再送しません。転送後は一覧の名前・ユーザー状態を再取得して照合します。内容全体は本体から読み戻せず、完全一致や音を確認したという意味ではありません。既存データに元ファイルがない場合、上書き前へ復元できません。 元ファイルは必ず保管してください。
+
+## オフラインNAM → SnapTone変換
+
+「ファイル → NAMをSnapToneに変換…」またはSnapTone / IR管理の変換ボタンから開きます。GP-5の接続は不要です。
+
+1. NAMファイルを選択します。対応するA1 / A2構成を検査し、未対応の構成は理由を表示して停止します。
+2. インストール済みValeton Suiteの nam_input_wav.wav を自動検出します。見つからない場合は「ファイルを指定…」で同ファイルまたはValeton Suite.exeを選択してください。
+3. 「SnapToneに変換」でPC内の計算を開始します。途中で中止できます。
+4. 完了後「ファイルに保存…」で2696バイトの .clo / .vtsi を保存します。変換だけでは本体へ転送しません。
+
+テスト信号はSuiteの data/flutter_assets/assets/wavs/nam_input_wav.wav（44.1kHz / PCM16 / 約70秒）です。配布物には含みません。一度指定するとアプリデータ内へ保存し、次回からオフラインで使用します。変換履歴には入力と出力のSHA-256を記録します。NAMに対する追加のCab IR焼き込みや汎用の全NAM構成は対象外です。読み込むモデルの利用条件も確認してください。
+
+変換器はVLTN Tone Studio由来のGPL-3.0プログラムを独立CLIとして同梱しています。converter/ に対応ソース・ビルド手順・ライセンス・出典があります。エディター原作の権利表示は引き続き保持します。変換結果の聴感とGP-5での再生は未確認です。
 
 ## 自動同期
 
@@ -84,9 +97,10 @@ powershell
 npm ci
 npm run brand
 node scripts/check-gp5-export.cjs
-node --test scripts/test-presets.cjs scripts/test-library-assets.cjs
+npm run build:converter
+node --test scripts/test-presets.cjs scripts/test-library-assets.cjs scripts/test-converter.cjs
 npm start
 npm run package
 
 
-ビルド出力は ../../outputs/<version>/。検証範囲はVALIDATION.md、機能状況はFEATURE_REVIEW.mdを参照してください。NAM変換、ファームウェア更新、初期化機能はありません。
+ビルド出力は ../../outputs/<version>/。検証範囲はVALIDATION.md、機能状況はFEATURE_REVIEW.mdを参照してください。ファームウェア更新、初期化機能はありません。

@@ -23,3 +23,7 @@ The offline desktop wrapper, application icon, GP-5 desktop controls and packagi
 GP-5の.prst構造・Suite通信記録を公開したfsanchezlme97-ui氏とAndrew Mercurio氏に感謝します。追加資料としてVLTN-Tone-Studioも参照しました。出典はPROTOCOL_SOURCES.md、同梱テスト資料のMIT通知はCOMMUNITY-PROTOCOL-LICENSE.txtをご覧ください。
 
 
+
+## 0.5.0のNAM変換器
+
+VLTN Tone Studioのgrzmol氏、Neural Amp ModelerのSteven Atkinson氏、r8brainのAleksey Vaneev氏、FFTのTakuya Ooura氏に感謝します。変換器はGPL-3.0で別プロセスとして実行し、対応ソースと通知をconverter/に同梱します。Valeton Suiteのテスト信号は各利用者のインストールから読み込みます。詳しくはconverter/NOTICE.mdをご覧ください。

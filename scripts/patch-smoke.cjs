@@ -103,14 +103,17 @@ module.exports = async function patchSmoke(win, { root, mode, model = 'gp5', smo
     const library=path.join(path.dirname(backupDir),'asset-library');const receipts=fs.readdirSync(library).map(n=>JSON.parse(fs.readFileSync(path.join(library,n,'transfer.json'))));
     result.assetArchives=['ir','snap'].every(kind=>receipts.some(r=>r.kind===kind&&r.status==='table-confirmed'&&r.contentReadback===false));
   }else result.assetArchives=true;
+  win.setContentSize(1280,800);await new Promise(r=>setTimeout(r,100));
+  result.defaultFits=await win.webContents.executeJavaScript(`(()=>{let fits=true;for(const b of document.querySelectorAll('#btn_list button[data-card]')){b.click();const f=GP5FitLayout(),main=document.querySelector('body > .container-fluid');fits=fits&&!f.scroll&&main.scrollWidth<=main.clientWidth+1&&gui.btn_tap.getBoundingClientRect().height>=44;}return fits;})()`);
   for(const size of [[1100,650],[900,560]]){
     win.setContentSize(...size);await new Promise(r=>setTimeout(r,100));
     result.footerVisible=(result.footerVisible??true)&&await win.webContents.executeJavaScript(`(()=>{const r=gui.btn_save_patch.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.height>0;})()`);
   }
   win.setContentSize(1100,720);await new Promise(r=>setTimeout(r,100));
-  result.snapOverlay=await win.webContents.executeJavaScript(`(()=>{patchNS=true;refreshGUI();return gui.amp_button.classList.contains('nam-context')&&gui.cab_button.classList.contains('nam-context')&&!gui.amp_button.classList.contains('bg-danger-subtle')&&document.querySelector('.nam-status').textContent.includes('SnapTone ON')&&document.querySelector('label[for="amp_live"] .live-effect-name').textContent==='AMP';})()`);
+  result.snapOverlay=await win.webContents.executeJavaScript(`(()=>{patchNS=true;refreshGUI();return gui.amp_button.classList.contains('nam-context')&&gui.cab_button.classList.contains('nam-context')&&!gui.amp_button.classList.contains('bg-danger-subtle')&&document.querySelector('.nam-status').textContent.includes('NAM / SnapTone —')&&document.querySelector('label[for="amp_live"] .live-effect-name').textContent==='AMP';})()`);
   fs.writeFileSync(path.join(smokeDir,`${mode}-compact.png`),(await win.webContents.capturePage()).toPNG());
-  result.liveLayout=await win.webContents.executeJavaScript(`(()=>{gui.live_switch.checked=true;gui.live_switch.dispatchEvent(new Event('change'));return document.body.classList.contains('live-mode')&&getComputedStyle(document.querySelector('.file-tools')).display==='none'&&gui.btn_tap.getBoundingClientRect().height>=58&&getComputedStyle(gui.global_bpm_value).display==='none'&&document.querySelector('.btn-live').getBoundingClientRect().height>=80;})()`);
+  result.normalFits=await win.webContents.executeJavaScript(`(()=>{const fit=GP5FitLayout();return !fit.scroll&&gui.btn_tap.getBoundingClientRect().height>=44;})()`);
+  result.liveLayout=await win.webContents.executeJavaScript(`(()=>{gui.live_switch.checked=true;gui.live_switch.dispatchEvent(new Event('change'));GP5FitLayout();return document.body.classList.contains('live-mode')&&getComputedStyle(document.querySelector('.file-tools')).display==='none'&&gui.btn_tap.getBoundingClientRect().height>=54&&getComputedStyle(gui.global_bpm_value).display==='none'&&document.querySelector('.btn-live').getBoundingClientRect().height>=80&&!GP5FitLayout().scroll&&!/ON|OFF/.test(getComputedStyle(document.querySelector('.btn-live'),'::after').content);})()`);
   await new Promise(r=>setTimeout(r,100));fs.writeFileSync(path.join(smokeDir,`${mode}-live.png`),(await win.webContents.capturePage()).toPNG());
   await win.webContents.executeJavaScript(`gui.live_switch.checked=false;gui.live_switch.dispatchEvent(new Event('change'));`);
   rejectBackup(true);

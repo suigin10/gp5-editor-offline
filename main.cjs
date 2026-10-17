@@ -17,6 +17,7 @@ const bluetoothURL = pathToFileURL(bluetoothEntry).href;
 const smokeDir = process.env.GP5_SMOKE_DIR || path.join(__dirname, 'smoke');
 let win;
 let bluetoothPicker;
+let conversionController;
 let mode = 'usb';
 let model = 'gp5';
 const routes = Object.fromEntries(Object.values(profiles.PROFILES).flatMap(p => ['usb','bluetooth'].map(transport => [pathToFileURL(path.join(__dirname,'app',p[transport])).href, { model:p.key, transport }])));
@@ -43,6 +44,7 @@ function updateChecks() {
 }
 async function switchMode(next) { return switchEditor(model,next); }
 async function switchEditor(nextModel,nextMode) {
+  if(conversionController?.busy)return;
   if (model === nextModel && mode === nextMode) { updateChecks(); return; }
   if (await win.webContents.executeJavaScript('!!window.GP5Patches?.busy')) { updateChecks(); return; }
   const connected = await win.webContents.executeJavaScript(mode === 'usb'
@@ -111,6 +113,7 @@ app.whenReady().then(async () => {
     } finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
   }
   require('./file-services.cjs')({win,isEditor,checked,atomicSave,storage:app.getPath('userData'),smokeDir,smoke});
+  conversionController=require('./conversion-service.cjs').install({win,isEditor,storage:app.getPath('userData'),converterRoot:app.isPackaged?path.join(path.dirname(app.getPath('exe')),'converter'):path.join(__dirname,'converter'),smokeDir,smoke});
   ipcMain.handle('gp5-file-save', async (event, bytes, name) => {
     const data = checked(event, bytes);
     if (smoke) { atomicSave(path.join(smokeDir, `pc-${model}-${mode}.prst`), data); return `pc-${model}-${mode}.prst`; }
@@ -172,6 +175,7 @@ app.whenReady().then(async () => {
       {label:'パッチバックアップを開く',click:()=>fileAction('backups')},
       {type:'separator'},
       {label:'SnapTone / IR管理…',click:()=>fileAction('assets')},
+      {label:'NAMをSnapToneに変換…',click:()=>fileAction('convert')},
       {label:'IR WAVファイルを確認…',click:()=>fileAction('ir')},
       {label:'SnapToneファイルを確認…',click:()=>fileAction('snap')},
       {label:'IR / SnapTone元ファイル保管先',click:()=>fileAction('library')},
@@ -225,6 +229,7 @@ app.whenReady().then(async () => {
     usb.presetDownloadState = completed;
     usb.presetDownloadPassed = completed === 'completed' && fs.readFileSync(path.join(smokeDir, 'synthetic.prst')).equals(Buffer.from([71,80,45,53,0]));
     const patchTests = process.env.GP5_PATCH_TEST_ROOT ? require(path.join(process.env.GP5_PATCH_TEST_ROOT, 'scripts/patch-smoke.cjs')) : null;
+    if (patchTests && process.env.GP5_SIGNAL_FILE) usb.converter = await require(path.join(process.env.GP5_PATCH_TEST_ROOT,'scripts/converter-smoke.cjs'))(win,{root:process.env.GP5_PATCH_TEST_ROOT,smokeDir});
     if (patchTests) usb.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, model, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
     fs.writeFileSync(path.join(smokeDir, 'usb-window.png'), (await win.webContents.capturePage()).toPNG());
     await switchMode('bluetooth');

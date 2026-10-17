@@ -28,4 +28,7 @@ MIT notices: COMMUNITY-PROTOCOL-LICENSE.txt. Details: PROTOCOL_SOURCES.md.
 These notices do not change the original rvalladares editor rights.
 
 
-0.4.0: GP-50 support removed. IR/SnapTone format facts consulted in VLTN Tone Studio (GPL-3.0); independently implemented here. No VLTN code, fixtures, converter engines or models bundled. See PROTOCOL_SOURCES.md.
+0.4.0: GP-50 support removed. IR/SnapTone format facts consulted in VLTN Tone Studio (GPL-3.0); independently implemented here. In 0.4.0 no VLTN code, fixtures, converter engines or models were bundled. See PROTOCOL_SOURCES.md.
+
+0.5.0 adds a separate GPL-3.0-only NAM converter based on VLTN Tone Studio.
+Complete corresponding source and notices ship in converter/ (NOTICE.md, LICENSE-GPL-3.0.txt, ORIGIN.json, src/, build scripts). See NEURALAMPMODELER-MIT.txt and R8BRAIN-MIT.txt there. No Valeton Suite DLL or test signal is bundled. These notices do not relicense the original editor.

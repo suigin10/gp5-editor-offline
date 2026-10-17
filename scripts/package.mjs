@@ -21,10 +21,11 @@ const result = await packager({
   icon: path.join(root, 'app/assets/app-icon.ico'),
   electronZipDir: cached,
   out: path.resolve(root, '../../outputs', version), asar: true, overwrite: true,
-  ignore: [/^\/upstream/, /^\/scripts/, /^\/smoke/, /^\/package-lock\.json/],
+  ignore: [/^\/upstream/, /^\/scripts/, /^\/smoke/, /^\/converter/, /^\/package-lock\.json/],
   download: { cacheRoot }
 });
 for (const output of result) {
+  fs.cpSync(path.join(root,'converter'),path.join(output,'converter'),{recursive:true});
   for (const file of ['README.txt', 'README.md', 'ACKNOWLEDGEMENTS.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.txt', 'DISTRIBUTION.md', 'VALIDATION.md', 'BOOTSTRAP-LICENSE.txt', 'COMMUNITY-PROTOCOL-LICENSE.txt', 'PROTOCOL_SOURCES.md', 'FEATURE_REVIEW.md']) {
     fs.copyFileSync(path.join(root, file), path.join(output, file));
   }

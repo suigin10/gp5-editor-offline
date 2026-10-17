@@ -19,7 +19,7 @@
   }
   function snap(bytes) {
     const b=Uint8Array.from(bytes), d=new DataView(b.buffer);
-    if(b.length!==2696 || String.fromCharCode(...b.slice(0,4))!=='VTSI') throw Error('2696バイトの変換済みSnapTone（VTSI）ファイルを選択してください。NAMや8840バイトの中間ファイルには未対応です。');
+    if(b.length!==2696 || String.fromCharCode(...b.slice(0,4))!=='VTSI') throw Error('2696バイトの変換済みSnapTone（VTSI）ファイルを選択してください。NAMは変換メニューで先に変換してください。8840バイトの中間ファイルは転送できません。');
     if(d.getUint32(4,true)!==2696 || d.getUint32(20,true)!==2560 || b[18]!==0 || b[19]!==0) throw Error('SnapToneの形式・サイズが未対応です。');
     if(crc16(b.slice(12))!==(b[8]*256+b[9])) throw Error('SnapToneのCRCが一致しません。');
     return {data:b,description:'VTSI / 2696 bytes / CRC確認済み'};

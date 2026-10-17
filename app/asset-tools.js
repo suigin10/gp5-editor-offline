@@ -6,8 +6,8 @@
     <p class="small">一覧はUSB / Bluetooth、ファイル転送はUSBで利用できます。</p>
     <div class="d-flex gap-2 my-2"><select id="asset-kind" class="form-select"><option value="ir">User IR（20枠）</option><option value="snap">SnapTone（80枠・ユーザー51〜80）</option></select><button id="asset-refresh" class="btn btn-secondary">本体一覧を取得</button></div>
     <div class="asset-slots"><table class="table table-sm"><thead><tr><th>選択</th><th>本体の名前</th><th>状態</th></tr></thead><tbody id="asset-table"></tbody></table></div>
-    <button id="asset-file" class="btn btn-outline-info my-2">ファイルを確認…</button>
-    <p id="asset-info" class="small text-break">IR: 44.1kHz WAV / SnapTone: 変換済み2696バイトVTSI。NAM変換は未対応。</p>
+    <button id="asset-file" class="btn btn-outline-info my-2">ファイルを確認…</button><button id="asset-nam" class="btn btn-outline-info m-2">NAMから変換…</button>
+    <p id="asset-info" class="small text-break">IR: 44.1kHz WAV / SnapTone: 変換済み2696バイトVTSI。NAMは「NAM → SnapTone変換」から準備できます。</p>
     <label>転送名 <input id="asset-name" maxlength="10" class="form-control" autocomplete="off"></label>
     <div class="d-flex gap-2 my-2"><button id="asset-upload" class="btn btn-warning" disabled>USBで選択枠へ転送</button><button id="asset-library" class="btn btn-secondary">元ファイル保管先</button></div>
     <p class="small">転送で選択枠を上書きします。元ファイルと転送履歴をPCに保管します。本体の既存IR / SnapToneの中身はバックアップできません。転送後は一覧の名前・状態のみ照合します。</p><p id="asset-result" role="status"></p>`;
@@ -38,6 +38,7 @@
     try{const file=await gp5Files.assetOpen(kind());if(!file)return;prepared=file;el('name').value=file.filename.replace(/\.[^.]*$/,'').replace(kind()==='snap'?/[^A-Za-z0-9]/g:/[^\x20-\x7e]|\$/g,'').slice(0,10)||'Tone';el('info').textContent=`${file.filename}: ${file.description} / SHA-256 ${file.hash}`;update();}catch(e){el('result').textContent=e.message;}
   }
   el('file').onclick=chooseFile;
+  el('nam').onclick=()=>{if(!working&&!P.busy){panel.close();GP5Converter.open();}};
   el('upload').onclick=async()=>{
     if(ble||working||P.busy)return;
     const picked=panel.querySelector('input[name=asset-slot]:checked'),file=prepared,k=kind(),name=el('name').value;

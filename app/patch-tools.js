@@ -252,8 +252,8 @@
     fileAction(action){
       if(busy)return;
       if(polling){polling.finally(()=>API.fileAction(action));return;}
-      const actions={save:savePC,open:loadPC,copy:openCopy,batch:()=>batchBackup(),backups:()=>gp5Files.showBackups(),assets:()=>API.assets.open(),ir:()=>API.assets.open('ir',true),snap:()=>API.assets.open('snap',true),library:()=>gp5Files.showAssets(),rename:()=>document.getElementById('rename_pc_patch').click()};
-      if(document.querySelector('dialog[open]')&&!['assets','ir','snap','library'].includes(action))return;
+      const actions={save:savePC,open:loadPC,copy:openCopy,batch:()=>batchBackup(),backups:()=>gp5Files.showBackups(),assets:()=>API.assets.open(),ir:()=>API.assets.open('ir',true),snap:()=>API.assets.open('snap',true),library:()=>gp5Files.showAssets(),convert:()=>GP5Converter.open(),rename:()=>document.getElementById('rename_pc_patch').click()};
+      if(document.querySelector('dialog[open]')&&!['assets','ir','snap','library','convert'].includes(action))return;
       Promise.resolve(actions[action]?.()).catch(e=>alert(errorText(e)));
     },
     observed(data) { lastBody = Uint8Array.from({ length: (data.length - 4) / 2 }, (_, i) => data[4 + i * 2] * 16 + data[5 + i * 2]); },

@@ -7,7 +7,7 @@ dialog { max-width:min(96vw,780px); max-height:90vh; overflow:auto; color:#dee2e
 dialog::backdrop { background:#000a; }
 .asset-slots { max-height:36vh; overflow:auto; }
 .asset-slots table { font-size:.9rem; }
-.tempo-panel #btn_tap { min-width:90px; }
+.tempo-panel #btn_tap { min-width:160px; min-height:56px; padding:10px 16px; font-size:1.4rem!important; touch-action:manipulation; }
 .tempo-panel #btn_tap_minus,.tempo-panel #btn_tap_plus { padding:4px 8px; }
 .tempo-panel .btn-group { max-width:230px; }
 .file-tools #batch_pc_patches,.file-tools #open_patch_backups { display:none; }
@@ -17,25 +17,24 @@ body.live-mode .edit-only { display:none!important; }
 body.live-mode #btn_disconnect { max-width:200px; justify-self:end; width:100%; }
 body.live-mode .tempo-panel input,body.live-mode .tempo-panel .mt-2,
 body.live-mode #btn_tap_minus,body.live-mode #btn_tap_plus { display:none!important; }
-body.live-mode #btn_tap { font-size:1.4rem; min-height:58px; min-width:140px; }
+body.live-mode #btn_tap { font-size:1.5rem!important; min-height:64px; min-width:180px; }
 body.live-mode #live_number { font-size:clamp(36px,7vh,72px); }
 body.live-mode #live_name { font-size:clamp(22px,3vh,32px); padding:4px!important; }
 body.live-mode #live_number { line-height:1.1; }
 body.live-mode .tempo-column { order:3; width:100%; }
 body.live-mode .live-on.col-lg-6 { width:100%; }
-body.live-mode .btn-live { min-height:clamp(80px,13vh,110px); display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px solid #6c757d; opacity:1!important; color:#f8f9fa!important; }
-body.live-mode .live-effect { max-height:clamp(28px,4.5vh,40px); width:auto; }
+body.live-mode .btn-live { min-height:clamp(104px,16vh,154px); display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px solid #6c757d; opacity:1!important; color:#f8f9fa!important; touch-action:manipulation; }
+body.live-mode .live-effect { max-height:clamp(52px,8vh,84px); width:auto; }
 .live-effect-name { font-weight:700; font-size:1rem; }
-body.live-mode .btn-check + .btn-live::after { content:'OFF'; font-weight:700; color:#adb5bd; }
-body.live-mode .btn-check:checked + .btn-live { border-color:#6edff6; background:#12394a; }
-body.live-mode .btn-check:checked + .btn-live::after { content:'ON'; color:#6edff6; }
+body.live-mode .btn-check:not(:checked) + .btn-live img { opacity:.3; filter:grayscale(.75); }
+body.live-mode .btn-check:checked + .btn-live { border-color:#6edff6; background:#12394a; box-shadow:inset 0 0 18px #32c5ea38; }
 .nam-status { margin:8px 0; padding:8px 12px; border:1px solid #6edff6; border-radius:6px; background:#12394a; color:#bceefa; font-weight:700; }
 .nam-context { position:relative; background:repeating-linear-gradient(135deg,#273541 0px,#273541 9px,#1b232d 9px,#1b232d 18px)!important; border:2px dashed #9aafc2!important; }
 .nam-context img { filter:grayscale(1); opacity:.35; }
 button.nam-context::after { content:'SnapTone 使用中'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:clamp(.65rem,1.3vw,1rem); font-weight:700; text-shadow:0 1px 3px #000; pointer-events:none; }
 label.nam-context::before { content:'SnapTone 使用中'; color:#fff; font-size:.8rem; font-weight:700; }
 .nam-source { border:2px solid #6edff6!important; background:#12394a!important; position:relative; }
-.nam-source::after { content:'SnapTone ON'; display:block; position:absolute; bottom:4px; left:0; width:100%; font-size:.7rem; font-weight:700; color:#bceefa; }
+.nam-source::after { content:'SnapTone'; display:block; position:absolute; bottom:4px; left:0; width:100%; font-size:.7rem; font-weight:700; color:#bceefa; }
 @media(max-height:760px) {
   .display-4 { font-size:2rem; }
   .display-4.pt-2.pb-3 { padding:4px!important; }

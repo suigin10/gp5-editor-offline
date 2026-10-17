@@ -1,4 +1,4 @@
-# GP-5 機能状況 — 0.4.0 / 2026-10-18
+# GP-5 機能状況 — 0.5.0 / 2026-10-18
 
 GP-50対応は未確認のため除去。現行アプリはGP-5 USB / Bluetooth専用です。0.3.0のGP-50対応は履歴にのみ残ります。
 
@@ -13,12 +13,12 @@ GP-50対応は未確認のため除去。現行アプリはGP-5 USB / Bluetooth�
 | 変換済みSnapTone USB転送 | 2696バイトVTSI / 2770バイト通信 / 146フレーム | A1/A2参照データの全フレーム一致、模擬通信成功。未確認 |
 | 元ファイル保管 | 転送前に元ファイル・準備データ・ハッシュ・状態を保存 | IPC・実ファイルで確認 |
 | BluetoothのIR / SnapTone転送 | 無効。一覧確認のみ | BLE転送の実機確認が必要 |
-| NAM変換・中間8840バイト形式 | 未対応 | 別途エンジン・依存・出力音の検証が必要 |
+| NAM → SnapToneオフライン変換・保存 | A1 / A2検査、Suiteテスト信号、自動検出・中止・2696バイト保存 | Suite出力との係数比較、オフラインUI・IPCを検証。聴感・GP-5再生は未確認 |
 
 IR / SnapToneのデータ本体を本体から完全に読み戻す仕様は確認できていません。一覧の名前・フラグ確認を内容の完全照合とは表示しません。元ファイルがなければ上書き前へ戻せません。.prst一括バックアップにIR / SnapTone本体は含みません。
 
 本体保存、コピー、一括走査、IR / SnapTone転送の今回の追加部分は、実機へ送信していません。不要なパッチと元ファイルのあるユーザー枠を使い、USBから順番に確認する必要があります。
 
-仕様参照: [VLTN Tone Studio v0.7.2](https://github.com/grzmol/VLTN-Tone-Studio/tree/8aae5c14edc13b5857b0ce42f277a420de0731bf)。GPL-3.0のコード・モデル・変換エンジンは組み込まず、形式・通信の事実から独自実装しました。ローカル照合で参照エンコーダーと一致することを確認しました。詳しくはPROTOCOL_SOURCES.md。
+仕様参照: [VLTN Tone Studio v0.7.2](https://github.com/grzmol/VLTN-Tone-Studio/tree/8aae5c14edc13b5857b0ce42f277a420de0731bf)。IR / SnapTone転送は形式・通信の事実から独自実装しました。0.5.0では別プロセスのGPL-3.0変換器と対応ソース・試験モデルを同梱します。ローカル照合で参照エンコーダーと一致することを確認しました。詳しくはPROTOCOL_SOURCES.md。
 
 原作者rvalladares氏の開発・公開に感謝します。[原作](https://rvalladares.com/gp5/gp5editor/) / [任意の寄付](https://www.buymeacoffee.com/rvalladares)

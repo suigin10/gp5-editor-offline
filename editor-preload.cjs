@@ -1,5 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('gp5Files', {
+  convertModel: () => ipcRenderer.invoke('gp5-convert-model'),
+  convertSignal: choose => ipcRenderer.invoke('gp5-convert-signal',!!choose),
+  convertRun: (id,jobId) => ipcRenderer.invoke('gp5-convert-run',id,jobId),
+  convertCancel: () => ipcRenderer.invoke('gp5-convert-cancel'),
+  convertSave: receipt => ipcRenderer.invoke('gp5-convert-save',receipt),
+  onConvertProgress: callback => ipcRenderer.on('gp5-convert-progress',(_event,message)=>callback(message)),
   onAction: callback => ipcRenderer.on('gp5-action',(_event,action)=>callback(action)),
   save: (bytes, name) => ipcRenderer.invoke('gp5-file-save', bytes, name),
   open: () => ipcRenderer.invoke('gp5-file-open'),

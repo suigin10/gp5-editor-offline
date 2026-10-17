@@ -1,0 +1,79 @@
+{
+  "repository": "https://github.com/grzmol/VLTN-Tone-Studio",
+  "commit": "8aae5c14edc13b5857b0ce42f277a420de0731bf",
+  "license": "GPL-3.0",
+  "files": [
+    {
+      "file": "src/nam.ts",
+      "upstream": "app/src/shared/nam.ts",
+      "sha256": "95d2925dd76d6bb879a94693faaa90777bf278c9925fd5ed62533cf9d29f02aa"
+    },
+    {
+      "file": "src/signal.ts",
+      "upstream": "app/src/shared/host/snaptone.ts",
+      "sha256": "947bc720ab4e249ee62602cfb73cca1eec2ff1d7101f3703866828e7b7a18553"
+    },
+    {
+      "file": "src/wavenet.ts",
+      "upstream": "app/src/renderer/src/snaptone/wavenet.ts",
+      "sha256": "b129ea9f51e6e1d63a5888f24542f04e9d3c8576d135b2c3b1d3ba002b4ad997"
+    },
+    {
+      "file": "src/a2.ts",
+      "upstream": "app/src/renderer/src/snaptone/a2.ts",
+      "sha256": "d698a055e127d8930bf9ee0c411df85af9242f33aa635de929e36f1b3637bcab"
+    },
+    {
+      "file": "src/kernel.ts",
+      "upstream": "app/src/renderer/src/snaptone/kernel.ts",
+      "sha256": "3677add3f8ba85fee3637f85cf89501d79650a7c5e28f5a3db8632d308d64c2c"
+    },
+    {
+      "file": "src/htkpa.ts",
+      "upstream": "app/src/renderer/src/snaptone/htkpa.ts",
+      "sha256": "e7e669764a73eba1cd6fd78f4462b8267343bc81f6c864e2972fa467b4d58ed7"
+    },
+    {
+      "file": "src/a1kernel.c",
+      "upstream": "app/src/renderer/src/snaptone/a1kernel.c",
+      "sha256": "1faf081af94fa0d09dafd73146e4ee0a73fa0139ca4f800dc2f0067309d4ebfb"
+    },
+    {
+      "file": "src/a2kernel.c",
+      "upstream": "app/src/renderer/src/snaptone/a2kernel.c",
+      "sha256": "528e0355e84cbc52f1fc724619b49dd37efea1424792dbe2f9d9d75c888ff988"
+    },
+    {
+      "file": "runtime/a1kernel.wasm",
+      "upstream": "app/src/renderer/src/snaptone/a1kernel.wasm",
+      "sha256": "149d814fdd95217ad6df795d83efe31a318af15d01ea42fdbac8f586a00118d5"
+    },
+    {
+      "file": "runtime/a2kernel.wasm",
+      "upstream": "app/src/renderer/src/snaptone/a2kernel.wasm",
+      "sha256": "7522ee1f6feeb6411fca02c2ffc39cdc8b601abb15ef251f1834025ed682fb6b"
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "tests/fixtures/a1.nam",
+      "upstream": "app/src/renderer/src/snaptone/fixtures/wavenet_a1_standard.nam",
+      "sha256": "c8d9711f32d032f8ad97cbc3c6706faf9a505469e8279a9abfbe123e824ca3f1"
+    },
+    {
+      "file": "tests/fixtures/a2.nam",
+      "upstream": "app/src/renderer/src/snaptone/fixtures/nam_core_a2.nam",
+      "sha256": "27852034f4d6fb2923f4b9cc40a1bf79f7c0c5f6745156f25886f06edcd808e9"
+    },
+    {
+      "file": "tests/fixtures/suite-a1.clo",
+      "upstream": "app/src/renderer/src/gp5/fixtures/snaptone-a1std.clo",
+      "sha256": "cf5f071d5acfa547cdc94992435b38fb62bb7f85a728caf791806497f2636b04"
+    },
+    {
+      "file": "tests/fixtures/suite-a2.clo",
+      "upstream": "app/src/renderer/src/gp5/fixtures/snaptone-a2.clo",
+      "sha256": "6a91e8efdd70292eed22d64347b934e5f422e2e0b1e09742e7a45e28e9890d1d"
+    }
+  ]
+}

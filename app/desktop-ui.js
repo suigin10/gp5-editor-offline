@@ -31,9 +31,26 @@
       document.querySelector(`label[for="${id.replace('_button','_live')}"]`).classList.toggle('nam-context',active);
     }
     const list=document.getElementById('ns_effects_list'),name=list.selectedOptions[0]?.textContent||'選択中のSnapTone';
-    namStatus.textContent=active?`NAM / SnapTone ON — ${name}`:'';namStatus.hidden=!active;
+    namStatus.textContent=active?`NAM / SnapTone — ${name}`:'';namStatus.hidden=!active;
     document.getElementById('ns_button').classList.toggle('nam-source',active);
   }
   const upstreamRefresh=refreshGUI;refreshGUI=function(){upstreamRefresh();syncSnapTone();};
   document.addEventListener('change',syncSnapTone);window.addEventListener('gp5-asset-names',syncSnapTone);syncSnapTone();
+  document.addEventListener('DOMContentLoaded',()=>{
+    const main=document.querySelector('body > .container-fluid'),content=document.createElement('div');content.className='fit-content';
+    while(main.firstChild)content.append(main.firstChild);main.append(content);
+    let frame=0;
+    function fit(){
+      frame=0;content.style.zoom='1';
+      const available=main.clientHeight-2,natural=Math.max(content.scrollHeight,content.getBoundingClientRect().height);
+      let scale=Math.max(.5,Math.min(1,Math.floor(available/Math.max(1,natural)*1000)/1000));content.style.zoom=String(scale);
+      for(let i=0;i<3&&main.scrollHeight>main.clientHeight+1&&scale>.5;i++){scale=Math.max(.5,Math.floor(scale*available/main.scrollHeight*1000)/1000);content.style.zoom=String(scale);}
+      main.dataset.fitScale=String(scale);return {scale,scroll:main.scrollHeight>main.clientHeight+1};
+    }
+    const schedule=()=>{if(!frame)frame=requestAnimationFrame(fit);};
+    new ResizeObserver(schedule).observe(main);
+    new MutationObserver(records=>{if(records.some(r=>r.target!==content))schedule();}).observe(content,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden']});
+    new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class']});
+    window.addEventListener('resize',schedule);document.addEventListener('change',schedule);window.GP5FitLayout=fit;schedule();
+  });
 })();

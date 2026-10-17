@@ -1,0 +1,24 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+module.exports=async function(win,{root,smokeDir}){
+ const signal=process.env.GP5_SIGNAL_FILE;if(!signal)throw Error('GP5_SIGNAL_FILE is required for converter smoke test');
+ fs.copyFileSync(path.join(root,'converter/tests/fixtures/a2.nam'),path.join(smokeDir,'converter-model.nam'));fs.copyFileSync(signal,path.join(smokeDir,'converter-signal.wav'));
+ const run=s=>win.webContents.executeJavaScript(s);
+ const wait=async expression=>{for(let i=0;i<240;i++){if(await run(expression))return;await new Promise(r=>setTimeout(r,250));}throw Error('Timed out: '+expression);};
+ const {Menu}=require('electron');Menu.getApplicationMenu().items[0].submenu.items.find(i=>i.label==='NAMをSnapToneに変換…').click();
+ await wait(`document.getElementById('nam-converter').open&&!GP5Converter.busy`);
+ assert(await run('inputPort===null&&outputPort===null'));
+ await run(`document.getElementById('nam-model').click()`);await wait('!GP5Converter.busy');
+ await run(`document.getElementById('nam-signal').click()`);await wait('!GP5Converter.busy');
+ assert(await run(`!document.getElementById('nam-run').disabled`));
+ await run(`document.getElementById('nam-run').click()`);await wait(`!document.getElementById('nam-cancel').hidden`);
+ await run(`document.getElementById('nam-cancel').click()`);await wait('!GP5Converter.busy');
+ assert(await run(`document.getElementById('nam-save').disabled`));
+ await run(`document.getElementById('nam-run').click()`);await wait('!GP5Converter.busy');
+ assert(await run(`!document.getElementById('nam-save').disabled`));
+ await run('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+ fs.writeFileSync(path.join(smokeDir,'converter-window.png'),(await win.webContents.capturePage()).toPNG());
+ await run(`document.getElementById('nam-save').click()`);await wait('!GP5Converter.busy');
+ assert.equal(require(path.join(root,'app/asset-codec.js')).snap(fs.readFileSync(path.join(smokeDir,'converted-result.clo'))).data.length,2696);
+ assert(await run(`inputPort===null&&outputPort===null&&document.getElementById('nam-status').textContent.includes('保存しました')`));
+ await run(`document.getElementById('nam-close').click()`);return {offline:true,cancelled:true,restarted:true,saved:true,noMidiOpened:true};
+};

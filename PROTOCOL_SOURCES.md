@@ -7,7 +7,7 @@ Additional primary community sources consulted for the 0.2.0 preset features:
 
 - https://github.com/fsanchezlme97-ui/gp5-editor — GP-5 Valeton Suite import/rename capture, `test/fixtures/gp5_suite_import.json`, `97-FF CC.prst`, `test/write.test.js`. MIT, copyright 2026 fsanchezlme97-ui; portions from Andrew Mercurio. Both notices are included in `COMMUNITY-PROTOCOL-LICENSE.txt`.
 - https://github.com/drewmerc302/valeton-gp50 — GP-5 .prst profile, CRC and container documentation. MIT, copyright 2026 Andrew Mercurio.
-- https://github.com/grzmol/VLTN-Tone-Studio — protocol facts concerning ACK pacing and stored-preset verification; no code copied from this project.
+- https://github.com/grzmol/VLTN-Tone-Studio — protocol facts concerning ACK pacing and stored-preset verification; no code copied for those preset features.
 
 The two test fixtures are copied from fsanchezlme97-ui/gp5-editor; see the included MIT notices. New codec/session/UI code was written for this port.
 
@@ -15,7 +15,7 @@ The GP-5 capture has **26** frames (`total=0x1a`), index 0..25, payload chunks o
 
 `node --test scripts/test-presets.cjs` compares every outgoing write and rename byte with the GP-5 Suite capture. This verifies encoding, not live hardware behavior. The same core frames use the existing `80 80` BLE-MIDI prefix in Bluetooth mode; Bluetooth preset imports have only been tested with a simulator in this port.
 
-Files must have the GP-5 header, 507-byte length, valid CRC, known record layout/device tag, valid order/masks, finite parameters and supported model IDs before import. No GP-50 conversion, IR/capture upload or firmware command is used.
+Files must have the GP-5 header, 507-byte length, valid CRC, known record layout/device tag, valid order/masks, finite parameters and supported model IDs before import. No GP-50 conversion or firmware command is used by preset import.
 
 Before import/save, both the current edit buffer and stored slot are backed up. Selecting another slot and returning is needed to read flash: re-selecting the same slot does not refresh the edit buffer. Each write frame waits for a CRC-checked ACK; a timeout stops without automatic retry. Verification reloads flash and compares the entire 466-byte body and name. Rename verifies the new name and checks that the edit buffer is unchanged.
 
@@ -39,4 +39,10 @@ The common parser reads the typed record structure, validates device tags, prote
 - ファイルACKはkind0x13または0x14、payload[2]=0。拒否・欠落で停止、自動再送しない。転送後は一覧の名前・flag0のみ照合。
 - 一覧は18/selector、count個の状態バイト、count個の16バイト名。IR20/SnapTone80。flag0=user、flag1=factory/empty。未知値と欠落は拒否。
 
-asset-codec.js、追加のsession/UI/PC保管は独自実装。GPLの参照コード・変換エンジン・数表・モデル・テストモデルは配布しません。ローカルの参照エンコーダーで両端スロット、A1/A2変換済み例を使い、全112/146フレームの一致を確認しました。GP-50用fixtureは異機種ファイルの拒否テストに限って保持します。
+asset-codec.js、追加のsession/UI/PC保管は独自実装。0.4.0ではGPLの参照コード・変換エンジン・数表・モデル・テストモデルを配布しませんでした。ローカルの参照エンコーダーで両端スロット、A1/A2変換済み例を使い、全112/146フレームの一致を確認しました。GP-50用fixtureは異機種ファイルの拒否テストに限って保持します。
+
+## 0.5.0 独立したNAM変換器
+
+同じVLTNコミットのNAM判定、A1/A2 WASMレンダー、リサンプル、SnapToneクローンをconverter/にGPL-3.0として同梱。原本ハッシュはORIGIN.json、変更点とライセンスはNOTICE.md。エディター側は独立CLIへファイルパスを渡し、出力をasset-codecで再検査します。通信処理とは独立し、未接続で変換できます。
+
+NAM→44.1kHzテスト信号をモデルレートへ変換→PCM24→A1/A2レンダー→0.31ゲイン→PCM16→8840バイトクローン→2696バイトへ整形・CRC更新。Suiteと同じパイプラインの量子化を反映しています。追加Cab IRは適用しません。
