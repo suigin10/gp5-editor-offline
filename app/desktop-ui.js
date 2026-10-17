@@ -16,8 +16,8 @@
   card.closest('.col-12').classList.add('tempo-column');
   const names=['NR','PRE','DST','AMP','CAB','EQ','MOD','DLY','RVB','N/S'];
   for(const input of document.querySelectorAll('.live-on input[data-effect]')){
-    const label=document.querySelector(`label[for="${input.id}"]`),name=document.createElement('span');
-    name.className='live-effect-name';name.textContent=names[Number(input.dataset.effect)];label.append(name);
+    const label=document.querySelector(`label[for="${input.id}"]`);
+    input.setAttribute('aria-label',names[Number(input.dataset.effect)]);label.setAttribute('aria-label',names[Number(input.dataset.effect)]);label.title=names[Number(input.dataset.effect)];
   }
   document.getElementById('live_switch').addEventListener('change',event=>document.body.classList.toggle('live-mode',event.target.checked));
   for(const id of ['btn_save_patch','btn_show_patch','btn_show_settings','global_vol_value'])document.getElementById(id).closest('[class*="col"]').classList.add('edit-only');
@@ -39,18 +39,39 @@
   document.addEventListener('DOMContentLoaded',()=>{
     const main=document.querySelector('body > .container-fluid'),content=document.createElement('div');content.className='fit-content';
     while(main.firstChild)content.append(main.firstChild);main.append(content);
-    let frame=0;
+    let frame=0,cacheKey='',scale=1;
     function fit(){
-      frame=0;content.style.zoom='1';
-      const available=main.clientHeight-2,natural=Math.max(content.scrollHeight,content.getBoundingClientRect().height);
-      let scale=Math.max(.5,Math.min(1,Math.floor(available/Math.max(1,natural)*1000)/1000));content.style.zoom=String(scale);
-      for(let i=0;i<3&&main.scrollHeight>main.clientHeight+1&&scale>.5;i++){scale=Math.max(.5,Math.floor(scale*available/main.scrollHeight*1000)/1000);content.style.zoom=String(scale);}
-      main.dataset.fitScale=String(scale);return {scale,scroll:main.scrollHeight>main.clientHeight+1};
+      frame=0;
+      const key=`${innerWidth}/${innerHeight}/${document.body.classList.contains('live-mode')}`;
+      const result=()=>({scale,scroll:main.scrollHeight>main.clientHeight+1});
+      if(key===cacheKey)return result();
+      cacheKey=key;content.style.zoom='1';
+      // Measure the tallest possible editor once per viewport/view. Restore classes
+      // before painting; selecting an effect or toggling SnapTone never changes zoom.
+      const cards=[...content.querySelectorAll('.effects_card')],groups=[...content.querySelectorAll('[id$="_group"]')];
+      const saved=[...cards,...groups].map(node=>[node,node.className]);
+      const live=document.body.classList.contains('live-mode');
+      function measure(metric){
+        let height=0;
+        if(!live){for(const group of groups)group.classList.remove('d-none');for(const card of cards)card.classList.add('d-none');}
+        for(const card of live?[null]:cards){
+          card?.classList.remove('d-none');height=Math.max(height,metric());card?.classList.add('d-none');
+        }
+        return height;
+      }
+      try{
+        const available=main.clientHeight-2,natural=measure(()=>Math.max(content.scrollHeight,content.getBoundingClientRect().height));
+        scale=Math.max(.5,Math.min(1,Math.floor(available/Math.max(1,natural)*1000)/1000));content.style.zoom=String(scale);
+        for(let i=0;i<3;i++){
+          const height=measure(()=>main.scrollHeight);if(height<=main.clientHeight+1||scale<=.5)break;
+          scale=Math.max(.5,Math.floor(scale*available/height*1000)/1000);content.style.zoom=String(scale);
+        }
+      }finally{for(const [node,classes] of saved)node.className=classes;}
+      main.dataset.fitScale=String(scale);return result();
     }
     const schedule=()=>{if(!frame)frame=requestAnimationFrame(fit);};
     new ResizeObserver(schedule).observe(main);
-    new MutationObserver(records=>{if(records.some(r=>r.target!==content))schedule();}).observe(content,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden']});
     new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class']});
-    window.addEventListener('resize',schedule);document.addEventListener('change',schedule);window.GP5FitLayout=fit;schedule();
+    window.addEventListener('resize',schedule);window.addEventListener('load',()=>{cacheKey='';schedule();});window.GP5FitLayout=fit;schedule();
   });
 })();

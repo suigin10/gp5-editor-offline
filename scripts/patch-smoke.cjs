@@ -103,17 +103,57 @@ module.exports = async function patchSmoke(win, { root, mode, model = 'gp5', smo
     const library=path.join(path.dirname(backupDir),'asset-library');const receipts=fs.readdirSync(library).map(n=>JSON.parse(fs.readFileSync(path.join(library,n,'transfer.json'))));
     result.assetArchives=['ir','snap'].every(kind=>receipts.some(r=>r.kind===kind&&r.status==='table-confirmed'&&r.contentReadback===false));
   }else result.assetArchives=true;
+  result.pollDuplicateRecovery=await win.webContents.executeJavaScript(`(async()=>{
+    const fake=fakePedal,deliver=fake.deliver;let injected=false,deferred=false,start=0;
+    const readQuery=${JSON.stringify(mode==='bluetooth'?'8080':'')}+GP5PresetCodec.hex(GP5PresetCodec.packetize([18,65])[0]);
+    const originalStatus=document.getElementById('patch_tools_status');originalStatus.textContent='同期テスト';
+    fake.deliver=wire=>{
+      const f=GP5PresetCodec.decode(wire);
+      if(!injected&&f?.index===0&&f.payload[0]===18&&f.payload[1]===64){
+        injected=true;const count=fake.sent.length;start=count;userChangedPatch=true;sendSysex(readQuery);deferred=fake.sent.length===count;
+      }
+      deliver(wire);if(f?.total>1&&(f.index===0||f.index===2))deliver(wire);
+    };
+    try{
+      userChangedPatch=false;initialSync=false;document.getElementById('auto_patch_sync').checked=true;
+      for(let n=0;n<140;n++){await new Promise(r=>setTimeout(r,50));if(injected&&deferred&&!userChangedPatch&&!GP5Patches.busy&&originalStatus.textContent==='本体と同期済み')return JSON.stringify(fake.sent.slice(start,start+3).map(f=>f.payload[1]))===JSON.stringify([65,67,65]);}
+      return false;
+    }finally{document.getElementById('auto_patch_sync').checked=false;while(GP5Patches.busy)await new Promise(r=>setTimeout(r,20));fake.deliver=deliver;}
+  })()`);
+  result.pollNotificationRecovery=await win.webContents.executeJavaScript(`(async()=>{
+    const fake=fakePedal,deliver=fake.deliver,writes=fake.writes;let injected=false,deferred=false;
+    const originalStatus=document.getElementById('patch_tools_status');originalStatus.textContent='同期テスト';
+    fake.deliver=wire=>{
+      const f=GP5PresetCodec.decode(wire);
+      if(!injected&&f?.index===0&&f.payload[0]===18&&f.payload[1]===65){
+        injected=true;fake.current=(fake.current+1)%100;fake.ram=fake.flash[fake.current].slice(41);
+        const count=fake.sent.length;deliver(GP5PresetCodec.packetize(${mode==='bluetooth'?'[18,67,fake.current,0,0,0]':'[18,27,0,0,0,0]'})[0]);deferred=fake.sent.length===count;
+      }
+      deliver(wire);if(f?.total>1&&(f.index===0||f.index===2))deliver(wire);
+    };
+    try{
+      userChangedPatch=false;initialSync=false;document.getElementById('auto_patch_sync').checked=true;
+      for(let n=0;n<140;n++){await new Promise(r=>setTimeout(r,50));if(injected&&deferred&&!userChangedPatch&&!GP5Patches.busy&&originalStatus.textContent==='本体と同期済み')return currentPatchNumber===fake.current&&fake.writes===writes;}
+      return false;
+    }finally{document.getElementById('auto_patch_sync').checked=false;while(GP5Patches.busy)await new Promise(r=>setTimeout(r,20));fake.deliver=deliver;}
+  })()`);
   win.setContentSize(1280,800);await new Promise(r=>setTimeout(r,100));
+  result.stableNormal=await win.webContents.executeJavaScript(`(async()=>{
+    const metric=()=>{const r=document.querySelector('#btn_list img').getBoundingClientRect();return [r.width,r.height,gui.btn_tap.getBoundingClientRect().height,document.querySelector('.fit-content').style.zoom].join('/');};
+    const base=metric();let stable=true;for(const b of document.querySelectorAll('#btn_list button[data-card]')){b.click();const groups=[...document.getElementById(b.dataset.card).querySelectorAll('[id$="_group"]')],saved=groups.map(g=>g.className);groups.forEach(g=>g.classList.remove('d-none'));GP5FitLayout();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));stable=stable&&metric()===base&&!GP5FitLayout().scroll;groups.forEach((g,i)=>g.className=saved[i]);}
+    for(const value of [false,true]){patchNS=value;refreshGUI();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));stable=stable&&metric()===base;}return stable;
+  })()`);
   result.defaultFits=await win.webContents.executeJavaScript(`(()=>{let fits=true;for(const b of document.querySelectorAll('#btn_list button[data-card]')){b.click();const f=GP5FitLayout(),main=document.querySelector('body > .container-fluid');fits=fits&&!f.scroll&&main.scrollWidth<=main.clientWidth+1&&gui.btn_tap.getBoundingClientRect().height>=44;}return fits;})()`);
   for(const size of [[1100,650],[900,560]]){
     win.setContentSize(...size);await new Promise(r=>setTimeout(r,100));
     result.footerVisible=(result.footerVisible??true)&&await win.webContents.executeJavaScript(`(()=>{const r=gui.btn_save_patch.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.height>0;})()`);
   }
   win.setContentSize(1100,720);await new Promise(r=>setTimeout(r,100));
-  result.snapOverlay=await win.webContents.executeJavaScript(`(()=>{patchNS=true;refreshGUI();return gui.amp_button.classList.contains('nam-context')&&gui.cab_button.classList.contains('nam-context')&&!gui.amp_button.classList.contains('bg-danger-subtle')&&document.querySelector('.nam-status').textContent.includes('NAM / SnapTone —')&&document.querySelector('label[for="amp_live"] .live-effect-name').textContent==='AMP';})()`);
+  result.snapOverlay=await win.webContents.executeJavaScript(`(()=>{patchNS=true;refreshGUI();return gui.amp_button.classList.contains('nam-context')&&gui.cab_button.classList.contains('nam-context')&&!gui.amp_button.classList.contains('bg-danger-subtle')&&document.querySelector('.nam-status').textContent.includes('NAM / SnapTone —')&&document.querySelector('label[for="amp_live"]').getAttribute('aria-label')==='AMP';})()`);
   fs.writeFileSync(path.join(smokeDir,`${mode}-compact.png`),(await win.webContents.capturePage()).toPNG());
   result.normalFits=await win.webContents.executeJavaScript(`(()=>{const fit=GP5FitLayout();return !fit.scroll&&gui.btn_tap.getBoundingClientRect().height>=44;})()`);
-  result.liveLayout=await win.webContents.executeJavaScript(`(()=>{gui.live_switch.checked=true;gui.live_switch.dispatchEvent(new Event('change'));GP5FitLayout();return document.body.classList.contains('live-mode')&&getComputedStyle(document.querySelector('.file-tools')).display==='none'&&gui.btn_tap.getBoundingClientRect().height>=54&&getComputedStyle(gui.global_bpm_value).display==='none'&&document.querySelector('.btn-live').getBoundingClientRect().height>=80&&!GP5FitLayout().scroll&&!/ON|OFF/.test(getComputedStyle(document.querySelector('.btn-live'),'::after').content);})()`);
+  result.liveLayout=await win.webContents.executeJavaScript(`(()=>{gui.live_switch.checked=true;gui.live_switch.dispatchEvent(new Event('change'));GP5FitLayout();return document.body.classList.contains('live-mode')&&getComputedStyle(document.querySelector('.file-tools')).display==='none'&&gui.btn_tap.getBoundingClientRect().height>=54&&getComputedStyle(gui.global_bpm_value).display==='none'&&document.querySelector('.btn-live').getBoundingClientRect().height>=80&&[...document.querySelectorAll('.btn-live')].every(label=>!label.textContent.trim())&&!document.querySelector('.live-effect-name')&&document.querySelector('.live-effect').getBoundingClientRect().height>=70&&!GP5FitLayout().scroll&&!/ON|OFF/.test(getComputedStyle(document.querySelector('.btn-live'),'::after').content);})()`);
+  result.stableLive=await win.webContents.executeJavaScript(`(async()=>{const metric=()=>[document.querySelector('.live-effect').getBoundingClientRect().height,document.querySelector('.fit-content').style.zoom].join('/');const base=metric();for(const state of [false,true]){patchNS=state;refreshGUI();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));if(metric()!==base||GP5FitLayout().scroll)return false;}return true;})()`);
   await new Promise(r=>setTimeout(r,100));fs.writeFileSync(path.join(smokeDir,`${mode}-live.png`),(await win.webContents.capturePage()).toPNG());
   await win.webContents.executeJavaScript(`gui.live_switch.checked=false;gui.live_switch.dispatchEvent(new Event('change'));`);
   rejectBackup(true);

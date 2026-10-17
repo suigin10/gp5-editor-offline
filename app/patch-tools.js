@@ -11,6 +11,18 @@
     if (ble) await writeChar.writeValueWithoutResponse(Uint8Array.from([128,128,...frame]));
     else outputPort.send(frame);
   }, ble ? 8000 : 4000, P.key);
+  // Legacy editor actions share the port with polling. Let the current read finish
+  // before a UI command can trigger another reply, and discard its stale snapshot.
+  const originalSendSysex = sendSysex;
+  let uiSends=Promise.resolve(),uiSending=0;
+  sendSysex = function(sysex) {
+    const active=polling;
+    if(active){revision++;lastEdit=Date.now();}
+    uiSending++;
+    const job=uiSends.then(async()=>{if(active)await active;return originalSendSysex(sysex);});
+    uiSends=job.catch(()=>{});
+    return job.finally(()=>{uiSending--;lastEdit=Date.now();});
+  };
   const row = document.createElement('div');
   row.className = 'file-tools d-flex flex-wrap align-items-center gap-2 p-2 border-bottom';
   row.innerHTML = `<button id="save_pc_patch" class="btn btn-outline-info btn-sm lockable" disabled>PCに保存…</button>
@@ -65,6 +77,7 @@
     mutated = false;
     try {
       if (polling) await polling;
+      await uiSends;
       disableGUI(true);
       progress(title); modal.showModal();
       await action();
@@ -251,6 +264,7 @@
     openCopy,copyPreset,batchBackup,
     fileAction(action){
       if(busy)return;
+      if(uiSending){uiSends.finally(()=>API.fileAction(action));return;}
       if(polling){polling.finally(()=>API.fileAction(action));return;}
       const actions={save:savePC,open:loadPC,copy:openCopy,batch:()=>batchBackup(),backups:()=>gp5Files.showBackups(),assets:()=>API.assets.open(),ir:()=>API.assets.open('ir',true),snap:()=>API.assets.open('snap',true),library:()=>gp5Files.showAssets(),convert:()=>GP5Converter.open(),rename:()=>document.getElementById('rename_pc_patch').click()};
       if(document.querySelector('dialog[open]')&&!['assets','ir','snap','library','convert'].includes(action))return;
@@ -261,15 +275,17 @@
       // Firmware notifications use the same nibble framing on USB and BLE (two-byte BLE header).
       const wire = ble ? bytes.slice(2) : bytes;
       const frame = C.decode(wire);
-      if (frame?.index === 0 && frame.payload[0] === 18 && frame.payload[1] === 27) namesDue = 0;
-      if (!busy && !polling) return false;
+      const patchNotification = frame?.index === 0 && frame.total === 1 && frame.payload[0] === 18 && (frame.payload[1] === 27 || (ble && frame.payload[1] === 67 && frame.payload.length === 6 && session.pending?.selector !== 67));
+      if (patchNotification) { namesDue = 0; revision++; }
+      // Observe idle traffic too, so the next read waits for the previous reply's tail.
       session.receive(wire);
+      if (!busy && (!polling || patchNotification)) return false;
       return true;
     }
   };
   gp5Files.onAction(action=>API.fileAction(action));
   async function poll() {
-    if (!autoSync.checked || busy || polling || initialSync || userChangedPatch || !connected() || document.querySelector('dialog[open]') || Date.now() - lastEdit < 500) return;
+    if (!autoSync.checked || busy || polling || uiSending || initialSync || userChangedPatch || !connected() || document.querySelector('dialog[open]') || Date.now() - lastEdit < 500) return;
     const before = revision;
     polling = (async () => {
       try {

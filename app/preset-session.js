@@ -2,26 +2,28 @@
   'use strict';
   const C = typeof module !== 'undefined' && module.exports ? require('./preset-codec.js') : root.GP5PresetCodec;
   class PresetSession {
-    constructor(send, timeout = 4000, deviceKey = 'gp5') { this.send = send; this.timeout = timeout; this.pending = null; this.profile = (typeof module !== 'undefined' && module.exports ? require('./device-profiles.js') : root.GPProfiles).get(deviceKey); }
-    wait(test) {
+    constructor(send, timeout = 4000, deviceKey = 'gp5') { this.send = send; this.timeout = timeout; this.pending = null; this.lastReceived = 0; this.profile = (typeof module !== 'undefined' && module.exports ? require('./device-profiles.js') : root.GPProfiles).get(deviceKey); }
+    wait(test, selector = null) {
       if (this.pending) throw Error('通信処理が競合しました。');
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => this.cancel(Error('本体からの応答がありません。接続を確認してください。')), this.timeout);
-        this.pending = { test, resolve: data => { clearTimeout(timer); this.pending = null; resolve(data); },
+        this.pending = { test, selector, resolve: data => { clearTimeout(timer); this.pending = null; resolve(data); },
           reject: error => { clearTimeout(timer); this.pending = null; reject(error); } };
       });
     }
     cancel(error) { this.pending?.reject(error); }
     receive(wire) {
       const frame = C.decode(wire);
-      if (!frame || !this.pending) return;
+      if (!frame) return;
+      this.lastReceived = Date.now();
+      if (!this.pending) return;
       try {
         const result = this.pending.test(frame);
         if (result) this.pending.resolve(result);
       } catch (error) { this.cancel(error); }
     }
-    async exchange(frame, test) {
-      const response = this.wait(test);
+    async exchange(frame, test, selector = null) {
+      const response = this.wait(test, selector);
       try { await this.send(frame); } catch (error) { this.cancel(error); }
       return response;
     }
@@ -32,16 +34,44 @@
         return f.payload;
       });
     }
+    async readQuiet() {
+      // Drain the tail of an interrupted reply before issuing another read.
+      const deadline = Date.now() + 600;
+      while (Date.now() - this.lastReceived < 40) {
+        if (Date.now() >= deadline) throw Error('本体からの応答が続いています。操作を止めて同期を待ってください。');
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
     async read(selector) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await this.readQuiet();
+        try { return await this.readOnce(selector); }
+        catch (error) { if (!error.readCollision || attempt) throw error; }
+      }
+    }
+    async readOnce(selector) {
       let chunks = [], total = 0, size = 0;
+      const collision = message => { throw Object.assign(Error(message), {readCollision:true}); };
       return this.exchange(C.packetize([18, selector])[0], frame => {
         if (frame.index === 0) {
-          if (frame.payload[0] !== 18 || frame.payload[1] !== selector) return null;
-          if (total) throw Error('読み取り中に別の応答が重複しました。');
+          if (frame.payload[0] !== 18 || frame.payload[1] !== selector) {
+            // A single-frame notification cannot add continuation packets to our reply.
+            if (total && frame.total > 1) collision('読み取り中に別の応答が割り込みました。');
+            return null;
+          }
+          if (total) {
+            if (frame.total === total && C.eq(frame.payload, chunks[0])) return null;
+            collision('読み取り中に応答内容が変わりました。');
+          }
           total = frame.total;
         }
-        if (!total || frame.total !== total) return null;
-        if (frame.index !== chunks.length) throw Error('パッチ応答の順番または一部が欠けています。');
+        if (!total) return null;
+        if (frame.total !== total) collision('読み取り中に応答の構成が変わりました。');
+        if (frame.index < chunks.length) {
+          if (C.eq(frame.payload, chunks[frame.index])) return null;
+          collision('読み取り中に同じ番号の応答内容が変わりました。');
+        }
+        if (frame.index !== chunks.length) collision('パッチ応答の順番または一部が欠けています。');
         chunks.push(frame.payload);
         size += frame.payload.length;
         if (size > 2200) throw Error('本体の応答が長すぎます。');
@@ -51,7 +81,7 @@
         if (expected && payload.length !== expected) throw Error('本体の応答サイズが一致しません。');
         if (selector === 67 && ![4, 6].includes(payload.length)) throw Error('パッチ番号の応答が不正です。');
         return payload;
-      });
+      }, selector);
     }
     async currentSlot() {
       const data = await this.read(67);

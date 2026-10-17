@@ -69,3 +69,28 @@ test('GP-50 files and device names are rejected',()=>{
   assert.throws(()=>C.parse(foreign));
   assert.equal(require('../app/device-profiles.js').matchesName('gp5','GP-50'),false);
 });
+
+for(const chunk of [19,100]) test(`duplicate first and continuation packets are ignored (${chunk===19?'USB':'Bluetooth'})`,async()=>{
+ let session;const fake=new Fake(fixture,wire=>{session.receive(wire);const f=C.decode(wire);if(f.index===0||f.index===2)session.receive(wire);},chunk);
+ session=new Session(wire=>fake.send(wire),400);
+ assert.deepEqual(await session.body(),fake.ram);assert.equal(fake.sent.length,1);assert.equal(fake.writes,0);
+});
+function changedFrame(wire,at=3){const f=C.decode(wire),payload=Array.from(f.payload);payload[at]^=1;const raw=[f.total,f.index,payload.length,...payload];return Uint8Array.from([240,...[C.crc8(raw),...raw].flatMap(b=>[b>>4,b&15]),247]);}
+for(const index of [0,2]) test(`conflicting duplicate packet ${index} discards the snapshot and re-reads without writes`,async()=>{
+ let session,first=true;const fake=new Fake(fixture,wire=>{session.receive(wire);if(first&&C.decode(wire).index===index){first=false;session.receive(changedFrame(wire));}});
+ session=new Session(wire=>fake.send(wire),400);
+ assert.deepEqual(await session.body(),fake.ram);assert.equal(fake.sent.length,2);assert(fake.sent.every(f=>f.payload[0]===18));assert.equal(fake.writes,0);
+});
+test('a foreign multi-frame reply is drained and a single notification is harmless',async()=>{
+ let session,interrupted=false;const fake=new Fake(fixture,wire=>{
+  const f=C.decode(wire);session.receive(wire);
+  if(!interrupted&&f.index===1){interrupted=true;for(const other of C.packetize([18,64,...Array(40).fill(90)]))session.receive(other);}
+ });
+ session=new Session(wire=>{fake.send(wire);session.receive(C.packetize([18,27,0,0,0,0])[0]);},400);
+ assert.deepEqual(await session.body(),fake.ram);assert.equal(fake.sent.length,2);assert.equal(fake.writes,0);
+});
+test('persistent conflicting replies stop after one read-only retry; no mixed snapshot or writes',async()=>{
+ let session;const fake=new Fake(fixture,wire=>{session.receive(wire);if(C.decode(wire).index===2)session.receive(changedFrame(wire));});
+ session=new Session(wire=>fake.send(wire),400);
+ await assert.rejects(session.body(),/応答内容/);assert.equal(fake.sent.length,2);assert.equal(fake.writes,0);assert.equal(session.pending,null);
+});
