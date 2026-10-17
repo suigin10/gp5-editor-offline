@@ -1,0 +1,34 @@
+[
+  {
+    "source": "https://rvalladares.com/gp5/gp5editor/usb.html",
+    "retrieved": "2026-10-17",
+    "sha256": "dba77bce29b1f03e1d0f77a720b36f968e09f6cc6ddfdd1421d4b57816fe04f9",
+    "original": "usb.html",
+    "local": "index.html",
+    "editorScriptChanged": true,
+    "changes": [
+      "Local image paths",
+      "Offline Content Security Policy",
+      "GP-5 USB/Bluetooth navigation links point to local files",
+      "0.1.1: removed GP-50 export code, unrelated links, Help modal, donation banner",
+      "0.1.1: moved USB/Bluetooth links beside Connect; GP-5 export bytes compared with original",
+      "0.1.2: own application icon and synchronized application version branding; acknowledgements and donation reference"
+    ]
+  },
+  {
+    "source": "https://rvalladares.com/gp5/gp5editor/",
+    "retrieved": "2026-10-17",
+    "sha256": "750f770239b70e30e3be3b80adc62cf9962ef0b7efb9b9cd6b3e370e17a18d27",
+    "original": "bluetooth.html",
+    "local": "bluetooth.html",
+    "editorScriptChanged": true,
+    "changes": [
+      "Local image paths",
+      "Offline Content Security Policy",
+      "GP-5 USB/Bluetooth navigation links point to local files",
+      "0.1.1: removed GP-50 export code, unrelated links, Help modal, donation banner",
+      "0.1.1: moved USB/Bluetooth links beside Connect; GP-5 export bytes compared with original",
+      "0.1.2: own application icon and synchronized application version branding; acknowledgements and donation reference"
+    ]
+  }
+]
