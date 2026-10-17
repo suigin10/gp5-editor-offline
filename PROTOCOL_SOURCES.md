@@ -27,3 +27,16 @@ Background synchronization only reads, uses one outstanding request, and pauses 
 The GP-50 Suite capture in `scripts/fixtures/gp50_suite_write_slot0.json` was extracted directly from the `WRITE` literal of drewmerc302/valeton-gp50 `patch/decode_import_capture.py` at aadcf9b7a2f051d8bce50b8654a6a935a07a06b0 (MIT). `gp50-US-Lead.prst` is reconstructed from that captured payload. All 29 frames match. GP-50 body reads use 511 bytes and Program Change with a 300 ms settle before readback. GP-5 keeps 466-byte reads and its GP-5 select command.
 
 The common parser reads the typed record structure, validates device tags, protects cross-model imports, and preserves GP-50 EXP, FS and 16-byte names. Rename commands retain the capture-verified 10-byte format. GP-50 live CTL/tempo commands remain off. No new IR, SnapTone, firmware or reset write opcode is sent. See FEATURE_REVIEW.md for planned features and upstream evidence.
+
+
+## 0.4.0 IR / SnapTone形式の独自実装
+
+参照: VLTN Tone Studio v0.7.2 / 8aae5c14edc13b5857b0ce42f277a420de0731bf、app/src/renderer/src/gp5/lib/{userir,snaptone,protocol,session}.mjs の説明・通信事実。
+
+- IR selector 0x20 / upload 0x21 / fxId 0x0A100000+slot0..19。44.1kHzの先頭512サンプル、符号拡張した24bitをint32 LEとして2048バイト。
+- SnapTone selector0x24 / upload0x25 / fxId0x0F000000+slot50..79。2696バイトVTSI、CRC16/MODBUS [12,end) を8..9へBE格納。サイズ4..7=2696、extend20..23=2560、type18/version19=0。
+- upload payload: SET+opcode、nId u32=0、fxId u32、name16、node16=0、fPara32=0、data。74バイトの前置き。既存GP-5 packetizerの19バイト分割を使用し112/146フレーム。
+- ファイルACKはkind0x13または0x14、payload[2]=0。拒否・欠落で停止、自動再送しない。転送後は一覧の名前・flag0のみ照合。
+- 一覧は18/selector、count個の状態バイト、count個の16バイト名。IR20/SnapTone80。flag0=user、flag1=factory/empty。未知値と欠落は拒否。
+
+asset-codec.js、追加のsession/UI/PC保管は独自実装。GPLの参照コード・変換エンジン・数表・モデル・テストモデルは配布しません。ローカルの参照エンコーダーで両端スロット、A1/A2変換済み例を使い、全112/146フレームの一致を確認しました。GP-50用fixtureは異機種ファイルの拒否テストに限って保持します。

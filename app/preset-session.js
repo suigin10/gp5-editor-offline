@@ -26,7 +26,11 @@
       return response;
     }
     async command(frame) {
-      return this.exchange(frame, f => f.total === 1 && f.index === 0 && f.payload[0] === 20 ? f.payload : null);
+      return this.exchange(frame, f => {
+        if(f.total!==1||f.index!==0||f.payload[0]!==20)return null;
+        if(f.payload.length<3||f.payload[2]!==0)throw Error('本体が操作を拒否しました。処理を中止します。');
+        return f.payload;
+      });
     }
     async read(selector) {
       let chunks = [], total = 0, size = 0;
@@ -60,9 +64,32 @@
       return Array.from({ length: 100 }, (_, i) => C.readName(data.slice(6 + i * 20, 6 + this.profile.fileNameLength + i * 20)));
     }
     async body() { return (await this.read(65)).slice(2); }
+    async assetTable(kind) {
+      const A=typeof module!=='undefined'&&module.exports?require('./asset-codec.js'):root.GP5AssetCodec;
+      return A.table(kind,await this.read(A.kindInfo(kind).selector));
+    }
+    async uploadAsset(kind,slot,name,data,progress=()=>{}) {
+      const A=typeof module!=='undefined'&&module.exports?require('./asset-codec.js'):root.GP5AssetCodec;
+      const frames=A.frames(kind,slot,name,data);
+      await new Promise(resolve=>setTimeout(resolve,300));
+      for(let i=0;i<frames.length;i++) {
+        await this.exchange(frames[i],frame=>{
+          const p=frame.payload;
+          if(frame.total!==1||frame.index!==0||![19,20].includes(p[0]))return null;
+          if(p.length<3||p[2]!==0)throw Error(`本体が転送を拒否しました（${i+1}/${frames.length}）。自動再送は行いません。`);
+          return p;
+        });
+        progress(i+1,frames.length);
+      }
+      for(let attempt=0;attempt<3;attempt++) {
+        await new Promise(resolve=>setTimeout(resolve,500));
+        const entry=(await this.assetTable(kind))[slot];
+        if(entry.flag===0&&entry.name===name)return entry;
+      }
+      throw Error('転送後の名前・状態が一致しません。内容の完全照合はできません。元ファイルを保管して再接続後に確認してください。');
+    }
     async select(target) {
-      if (this.profile.key === 'gp50') await this.send(Uint8Array.from([0xc0,target]));
-      else await this.command(C.selectFrame(target));
+      await this.command(C.selectFrame(target));
       await new Promise(resolve => setTimeout(resolve, 300));
       if (await this.currentSlot() !== target) throw Error('本体のパッチ切り替えを確認できません。');
     }

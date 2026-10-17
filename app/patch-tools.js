@@ -12,45 +12,25 @@
     else outputPort.send(frame);
   }, ble ? 8000 : 4000, P.key);
   const row = document.createElement('div');
-  row.className = 'd-flex flex-wrap align-items-center gap-2 p-2 border-bottom';
+  row.className = 'file-tools d-flex flex-wrap align-items-center gap-2 p-2 border-bottom';
   row.innerHTML = `<button id="save_pc_patch" class="btn btn-outline-info btn-sm lockable" disabled>PCに保存…</button>
     <button id="load_pc_patch" class="btn btn-outline-info btn-sm lockable" disabled>PCから読み込み…</button>
     <button id="rename_pc_patch" class="btn btn-outline-info btn-sm lockable" disabled>名前を変更…</button>
+    <button id="copy_pc_patch" class="btn btn-outline-info btn-sm lockable" disabled>コピー／別名保存…</button>
+    <button id="batch_pc_patches" class="btn btn-outline-info btn-sm lockable" disabled>一括バックアップ…</button>
+    <button id="asset_pc_tools" class="btn btn-outline-info btn-sm">SnapTone / IR…</button>
     <button id="open_patch_backups" class="btn btn-outline-secondary btn-sm">バックアップを開く</button>
     <label class="ms-sm-auto small"><input id="auto_patch_sync" type="checkbox" checked> 本体の変更を自動同期</label>
     <span id="patch_tools_status" class="small text-body-secondary" role="status" aria-live="polite">接続待ち</span>`;
   document.querySelector('.container-fluid > .row').after(row);
   gui.saveGP5Preset.closest('.dropdown').hidden = true;
-  const selector = document.createElement('div');
-  selector.className = 'd-flex gap-2 align-items-center px-2 py-1 border-bottom';
-  selector.innerHTML = '<span class="small">機種</span><nav id="device-model" class="btn-group btn-group-sm" aria-label="Device model"></nav><span class="small text-body-secondary" id="device-note"></span>';
-  for (const profile of Object.values(GPProfiles.PROFILES)) {
-    const link = document.createElement('a'); link.id = `model-${profile.key}`;
-    link.href = profile[GPTransport]; link.textContent = profile.name;
-    link.className = `btn btn-${profile.key === P.key ? 'primary' : 'outline-secondary'}`;
-    if (profile.key === P.key) link.setAttribute('aria-current','page');
-    selector.querySelector('nav').append(link);
-  }
-  row.before(selector);
-  if (P.key === 'gp50') {
-    selector.querySelector('#device-note').textContent = 'GP-50対応復元版・実機未検証 / CTLとテンポのライブ変更は検証待ち';
-    // Keep unverified GP-50 live footswitch/tempo writes off. The stored bytes are preserved in .prst.
-    const originalDisableGUI = disableGUI;
-    disableGUI = locked => {
-      originalDisableGUI(locked);
-      document.querySelectorAll('.check-ctl, #patch_bpm_value, #btn_tap, #btn_tap_minus, #btn_tap_plus').forEach(control => {
-        control.disabled = true; control.title = 'GP-50での実機検証後に対応予定です';
-      });
-    };
-    sendBPM = sendCTL = () => { status.textContent = 'GP-50のCTL・テンポのライブ変更は検証待ちです'; };
-  }
   gui.btn_save_patch.textContent = '本体に保存';
   const status = document.getElementById('patch_tools_status');
   const autoSync = document.getElementById('auto_patch_sync');
   const modal = document.createElement('dialog');
   modal.className = 'bg-dark text-light border border-secondary rounded p-4';
   modal.style.cssText = 'max-width:min(94vw,540px);';
-  modal.innerHTML = '<p id="patch_progress" role="status" aria-live="polite"></p><small>処理中は本体のパッチを切り替えず、接続を保ってください。</small>';
+  modal.innerHTML = '<button id="cancel_batch" class="btn btn-secondary btn-sm mb-2" hidden>このパッチの後で中止</button><p id="patch_progress" role="status" aria-live="polite"></p><small>処理中は本体のパッチを切り替えず、接続を保ってください。</small>';
   modal.addEventListener('cancel', event => event.preventDefault());
   document.body.append(modal);
   const progress = text => { modal.querySelector('p').textContent = text; status.textContent = text; };
@@ -170,18 +150,54 @@
       await commit(current.bytes, target, current);
     });
   }
-  async function selectGP50(target) {
-    if (patchChanged && !confirm('パッチを切り替えると未保存の編集を破棄します。切り替えますか？')) { gui.listPatches.value = currentPatchNumber; return; }
-    await run('パッチを切り替え中…', async () => {
-      await session.select(target);
-      const names = await session.names(), body = await session.body();
-      showBody(body,target,names,true); status.textContent = '本体と同期済み';
+  const copyDialog=document.createElement('dialog');copyDialog.id='copy-dialog';
+  copyDialog.innerHTML=`<h4>コピー／別名保存</h4><p id="copy-source"></p><label class="d-block my-2">新しいパッチ名（半角10文字まで）<input id="copy-name" class="form-control" maxlength="10" autocomplete="off"></label><label class="d-block my-2">本体へのコピー先<select id="copy-target" class="form-select"></select></label><p class="small">PCへの別名保存は本体を変更しません。本体へのコピーは保存先を上書きし、元の選択へ戻ります。未保存編集はPCに退避しますが、本体の編集バッファは保存済みの音色へ戻ります。</p><div class="d-flex flex-wrap gap-2"><button id="copy-to-pc" class="btn btn-info">PCに別名保存…</button><button id="copy-to-device" class="btn btn-warning">指定スロットにコピー</button><button id="copy-cancel" class="btn btn-secondary">閉じる</button></div>`;
+  document.body.append(copyDialog);
+  let copySource=null;
+  function openCopy(){
+    if(busy)return;
+    if(initialSync||!connected()){alert('GP-5を接続し、同期が終わってから操作してください。');return;}
+    copySource=currentPatchNumber;copyDialog.querySelector('#copy-source').textContent=`元のパッチ: ${copySource} - ${patchNames[copySource]}`;
+    copyDialog.querySelector('#copy-name').value=patchNames[copySource];
+    copyDialog.querySelector('#copy-target').replaceChildren(...patchNames.map((name,i)=>new Option(`${String(i).padStart(2,'0')} - ${name}`,i)));
+    copyDialog.querySelector('#copy-target').value=String((copySource+1)%100);copyDialog.showModal();
+  }
+  async function copyPreset(target,name,toPC=false){
+    C.nameField(name);
+    if(!toPC&&(!Number.isInteger(target)||target<0||target>99))throw Error('コピー先が不正です。');
+    const original=copySource;
+    if(original!==currentPatchNumber)throw Error('元のパッチが変わりました。ダイアログを開き直してください。');
+    if(!toPC&&!confirm(`${original}の現在の音色を ${target} - ${patchNames[target]} に「${name}」として上書き保存しますか？\n\n変更前のパッチをPCに保存します。パッチ切替により、元の未保存編集は本体からは失われます。PCバックアップから復元できます。`))return;
+    copyDialog.close();
+    await run(toPC?'別名保存の準備中…':'コピーの準備中…',async()=>{
+      const source=await snapshot(original),bytes=C.build(name,source.body,'gp5');
+      if(toPC){const saved=await gp5Files.save(Array.from(bytes),`gp5_${name}`);status.textContent=saved?`PCに別名保存: ${saved}`:'別名保存をキャンセルしました';return;}
+      await backup(source.bytes,`${original}-before-copy-editing-${source.names[original]}`);
+      let destination=source;
+      mutated=true;
+      if(target!==original){await session.select(target);destination=await snapshot(target);}
+      await commit(bytes,target,destination);
+      if(target!==original)await session.select(original);
+      showBody(await session.body(),original,await session.names(),true);
+      status.textContent=`${target}へコピー完了・元の選択へ復帰（未保存編集はPCへ退避済み）`;
     });
   }
-  if (P.key === 'gp50') {
-    gui.listPatches.onchange = () => selectGP50(Number(gui.listPatches.value));
-    gui.btn_previous.onclick = () => selectGP50((currentPatchNumber+99)%100);
-    gui.btn_next.onclick = () => selectGP50((currentPatchNumber+1)%100);
+  copyDialog.querySelector('#copy-cancel').onclick=()=>copyDialog.close();
+  for(const [id,toPC]of [['copy-to-pc',true],['copy-to-device',false]])copyDialog.querySelector('#'+id).onclick=()=>copyPreset(Number(copyDialog.querySelector('#copy-target').value),copyDialog.querySelector('#copy-name').value,toPC).catch(e=>alert(errorText(e)));
+  let cancelBatch=false;
+  modal.querySelector('#cancel_batch').onclick=()=>{cancelBatch=true;modal.querySelector('#cancel_batch').disabled=true;};
+  async function batchBackup(slots){
+    if(!confirm('保存済みパッチを一括バックアップします。\n\n未保存編集は最初にPCへ退避します。全パッチを順番に選択するため音が変わり、終了後は元の選択の保存済み音色へ戻ります。演奏中は実行しないでください。IR / SnapTone本体は含みません。'))return;
+    await run('一括バックアップの準備中…',async()=>{
+      const id=await gp5Files.batchStart();if(!id)return;
+      cancelBatch=false;const cancel=modal.querySelector('#cancel_batch');cancel.hidden=false;cancel.disabled=false;let outcome='failed';
+      try{
+        const result=await GP5LibraryOps.scan(session,{slots,editing:async(bytes,slot)=>{await gp5Files.batchWrite(id,Array.from(bytes),slot,true);await backup(bytes,`${slot}-before-batch-editing`);mutated=true;},save:(bytes,slot)=>gp5Files.batchWrite(id,Array.from(bytes),slot,false),cancelled:()=>cancelBatch,progress:(n,total)=>progress(`保存済みパッチをバックアップ中… ${n}/${total}`)});
+        outcome=result.cancelled?'cancelled':'complete';
+        showBody(await session.body(),await session.currentSlot(),await session.names(),result.selectionChanged);
+        status.textContent=`一括バックアップ${result.cancelled?'を中止':'完了'}: ${result.count}件、元の選択へ復帰（編集はPCへ退避済み）`;
+      }finally{cancel.hidden=true;await gp5Files.batchEnd(id,outcome);}
+    });
   }
   const renameDialog = document.createElement('dialog');
   let renameTarget = null;
@@ -219,15 +235,27 @@
     renameDialog.showModal(); renameDialog.querySelector('input').select();
   };
   document.getElementById('open_patch_backups').onclick = async () => { try { await gp5Files.showBackups(); } catch (error) { alert(errorText(error)); } };
+  document.getElementById('copy_pc_patch').onclick=openCopy;
+  document.getElementById('batch_pc_patches').onclick=()=>batchBackup();
+  document.getElementById('asset_pc_tools').onclick=()=>window.GP5Patches.fileAction('assets');
   gui.btn_save_patch.addEventListener('click', event => { event.stopImmediatePropagation(); saveDevice(); }, true);
   // Prevent upstream number/letter shortcuts while typing a name or during a transfer.
   document.addEventListener('keydown', event => {
-    if (busy || renameDialog.open || event.target.matches('input:not([type=range]):not([type=checkbox]), textarea')) event.stopPropagation();
+    if (busy || document.querySelector('dialog[open]') || event.target.matches('input:not([type=range]):not([type=checkbox]), textarea')) event.stopPropagation();
   }, true);
   for (const type of ['input', 'change', 'pointerdown']) document.addEventListener(type, () => { revision++; lastEdit = Date.now(); }, true);
   window.addEventListener('beforeunload', event => { if (busy) { event.preventDefault(); event.returnValue = false; } });
   const API = window.GP5Patches = {
     get busy() { return busy || !!polling; }, savePC, loadPreset,
+    withTask: (title,action)=>run(title,()=>action({session,progress})),
+    openCopy,copyPreset,batchBackup,
+    fileAction(action){
+      if(busy)return;
+      if(polling){polling.finally(()=>API.fileAction(action));return;}
+      const actions={save:savePC,open:loadPC,copy:openCopy,batch:()=>batchBackup(),backups:()=>gp5Files.showBackups(),assets:()=>API.assets.open(),ir:()=>API.assets.open('ir',true),snap:()=>API.assets.open('snap',true),library:()=>gp5Files.showAssets(),rename:()=>document.getElementById('rename_pc_patch').click()};
+      if(document.querySelector('dialog[open]')&&!['assets','ir','snap','library'].includes(action))return;
+      Promise.resolve(actions[action]?.()).catch(e=>alert(errorText(e)));
+    },
     observed(data) { lastBody = Uint8Array.from({ length: (data.length - 4) / 2 }, (_, i) => data[4 + i * 2] * 16 + data[5 + i * 2]); },
     receive(bytes) {
       // Firmware notifications use the same nibble framing on USB and BLE (two-byte BLE header).
@@ -239,8 +267,9 @@
       return true;
     }
   };
+  gp5Files.onAction(action=>API.fileAction(action));
   async function poll() {
-    if (!autoSync.checked || busy || polling || initialSync || userChangedPatch || !connected() || renameDialog.open || Date.now() - lastEdit < 500) return;
+    if (!autoSync.checked || busy || polling || initialSync || userChangedPatch || !connected() || document.querySelector('dialog[open]') || Date.now() - lastEdit < 500) return;
     const before = revision;
     polling = (async () => {
       try {

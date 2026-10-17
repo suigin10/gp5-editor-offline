@@ -8,4 +8,4 @@ Copied from https://github.com/fsanchezlme97-ui/gp5-editor/tree/main/test/fixtur
 MIT notices: ../../COMMUNITY-PROTOCOL-LICENSE.txt. Details: ../../PROTOCOL_SOURCES.md.
 These are test vectors, not user backups. Tests never open a real MIDI/Bluetooth device.
 
-GP-50 fixtures were reconstructed from the MIT `WRITE` capture in drewmerc302/valeton-gp50/patch/decode_import_capture.py, commit aadcf9b7a2f051d8bce50b8654a6a935a07a06b0. No VLTN GPL implementation was copied.
+gp50-US-Lead.prst was reconstructed from the MIT `WRITE` capture in drewmerc302/valeton-gp50/patch/decode_import_capture.py, commit aadcf9b7a2f051d8bce50b8654a6a935a07a06b0. In 0.4.0 it is used only to verify rejection of foreign-device files. No VLTN GPL implementation was copied.

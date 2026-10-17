@@ -35,8 +35,8 @@ module.exports = async function patchSmoke(win, { root, mode, model = 'gp5', smo
     checks.invalidNoTraffic = fake.sent.length === before;
     try { await GP5Patches.loadPreset({ bytes:${JSON.stringify(Array.from(otherFixture))} }); } catch {}
     checks.wrongModelNoTraffic = fake.sent.length === before;
-    checks.modelSelector = GPDevice.key === ${JSON.stringify(model)} && document.querySelector('#device-model [aria-current="page"]').textContent === GPDevice.name;
-    checks.experimentalDisabled = GPDevice.key !== 'gp50' || [...document.querySelectorAll('.check-ctl, #patch_bpm_value, #btn_tap, #btn_tap_minus, #btn_tap_plus')].every(control=>control.disabled);
+    checks.gp5Only = GPDevice.key === 'gp5' && !document.getElementById('device-model');
+    checks.singleModel = Object.keys(GPProfiles.PROFILES).join() === 'gp5';
     window.confirm = () => false;
     await GP5Patches.loadPreset({ bytes: desired });
     checks.cancelNoTraffic = fake.sent.length === before;
@@ -68,6 +68,51 @@ module.exports = async function patchSmoke(win, { root, mode, model = 'gp5', smo
   result.savedBytesVerified = saved.body[48] === 63 && saved.name === seedName;
   const backups = fs.readdirSync(backupDir).filter(n => n.endsWith('.prst')).map(n => ({ name:n, bytes:C.parse(fs.readFileSync(path.join(backupDir,n))) }));
   result.bothBackups = backups.some(b => b.name.includes('editing-') && b.bytes.body[48] === 63) && backups.some(b => b.name.includes('stored-') && b.bytes.body[48] === fixture[89]);
+  const wav=Buffer.alloc(44+1024);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVE',8);wav.write('fmt ',12);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(44100,24);wav.writeUInt32LE(88200,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(1024,40);wav.writeInt16LE(32767,44);fs.writeFileSync(path.join(smokeDir,'fixture-ir.wav'),wav);
+  const snap=Buffer.alloc(2696);snap.write('VTSI');snap.writeUInt32LE(2696,4);snap.writeUInt32LE(2560,20);const assetCodec=require('../app/asset-codec.js');snap.writeUInt16BE(assetCodec.crc16(snap.subarray(12)),8);fs.writeFileSync(path.join(smokeDir,'fixture-snap.vtsi'),snap);
+  const fileMenu=require('electron').Menu.getApplicationMenu().items[0].submenu;
+  result.fileMenu=fileMenu.items.some(i=>i.label==='パッチを一括バックアップ…')&&fileMenu.items.some(i=>i.label==='SnapTone / IR管理…');
+  fileMenu.items.find(i=>i.label==='コピー／別名保存…').click();
+  await new Promise(r=>setTimeout(r,100));
+  result.libraryAndAssets=await win.webContents.executeJavaScript(`(async()=>{
+    const wait=async fn=>{const end=Date.now()+15000;while(!fn()){if(Date.now()>end)throw Error('Extended UI timeout: '+testAlerts.join(' | '));await new Promise(r=>setTimeout(r,30));}};
+    if(!document.getElementById('copy-dialog').open)throw Error('Native File menu did not open Copy');
+    const original=fakePedal.current,editing=fakePedal.ram.slice();
+    await GP5Patches.copyPreset(9,'PC Alias',true);
+    if(!GP5PresetCodec.eq(fakePedal.ram,editing)||fakePedal.writes!==1)throw Error('PC Save As changed hardware');
+    GP5Patches.openCopy();await GP5Patches.copyPreset(9,'Copy Tone',false);
+    if(fakePedal.current!==original||GP5PresetCodec.parse(fakePedal.flash[9]).name!=='Copy Tone'||GP5PresetCodec.parse(fakePedal.flash[9]).body[48]!==editing[48])throw Error('Copy target/readback/return mismatch');
+    await GP5Patches.batchBackup([1,2,original]);
+    if(fakePedal.current!==original||!document.getElementById('patch_tools_status').textContent.includes('3件'))throw Error('Batch backup failed');
+    for(const kind of ['ir','snap']){
+      GP5Patches.assets.open(kind);document.getElementById('asset-refresh').click();await wait(()=>!GP5Patches.busy&&document.querySelectorAll('#asset-table tr').length===(kind==='ir'?20:80));
+      document.getElementById('asset-file').click();await wait(()=>document.getElementById('asset-info').textContent.includes('SHA-256'));
+      const slot=kind==='ir'?0:50;document.querySelector('#asset-table input[value="'+slot+'"]').checked=true;
+      if(${mode === 'bluetooth'}){if(!document.getElementById('asset-upload').disabled)throw Error('BLE upload was enabled');}
+      else{document.getElementById('asset-name').value=kind==='ir'?'TestCab':'TestTone';document.getElementById('asset-upload').click();await wait(()=>!GP5Patches.busy&&document.getElementById('asset-result').textContent.includes('転送完了'));}
+    }
+    document.getElementById('asset-close').click();
+    if(fakePedal.assetWrites!==${mode === 'bluetooth' ? 0 : 2})throw Error('Unexpected asset writes');
+    return testAlerts.length===0;
+  })()`);
+  const alias=C.parse(fs.readFileSync(path.join(smokeDir,`pc-${model}-${mode}.prst`)));
+  result.aliasFile=alias.name==='PC Alias'&&alias.body[48]===61;
+  const batchFolders=fs.readdirSync(smokeDir).filter(n=>n.startsWith('GP5-backup-'));
+  result.batchFiles=batchFolders.some(name=>{const m=JSON.parse(fs.readFileSync(path.join(smokeDir,name,'manifest.json')));return m.status==='incomplete'&&m.entries.filter(e=>!e.editing).length===3&&m.entries.some(e=>e.editing);});
+  if(mode==='usb'){
+    const library=path.join(path.dirname(backupDir),'asset-library');const receipts=fs.readdirSync(library).map(n=>JSON.parse(fs.readFileSync(path.join(library,n,'transfer.json'))));
+    result.assetArchives=['ir','snap'].every(kind=>receipts.some(r=>r.kind===kind&&r.status==='table-confirmed'&&r.contentReadback===false));
+  }else result.assetArchives=true;
+  for(const size of [[1100,650],[900,560]]){
+    win.setContentSize(...size);await new Promise(r=>setTimeout(r,100));
+    result.footerVisible=(result.footerVisible??true)&&await win.webContents.executeJavaScript(`(()=>{const r=gui.btn_save_patch.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.height>0;})()`);
+  }
+  win.setContentSize(1100,720);await new Promise(r=>setTimeout(r,100));
+  result.snapOverlay=await win.webContents.executeJavaScript(`(()=>{patchNS=true;refreshGUI();return gui.amp_button.classList.contains('nam-context')&&gui.cab_button.classList.contains('nam-context')&&!gui.amp_button.classList.contains('bg-danger-subtle')&&document.querySelector('.nam-status').textContent.includes('SnapTone ON')&&document.querySelector('label[for="amp_live"] .live-effect-name').textContent==='AMP';})()`);
+  fs.writeFileSync(path.join(smokeDir,`${mode}-compact.png`),(await win.webContents.capturePage()).toPNG());
+  result.liveLayout=await win.webContents.executeJavaScript(`(()=>{gui.live_switch.checked=true;gui.live_switch.dispatchEvent(new Event('change'));return document.body.classList.contains('live-mode')&&getComputedStyle(document.querySelector('.file-tools')).display==='none'&&gui.btn_tap.getBoundingClientRect().height>=58&&getComputedStyle(gui.global_bpm_value).display==='none'&&document.querySelector('.btn-live').getBoundingClientRect().height>=80;})()`);
+  await new Promise(r=>setTimeout(r,100));fs.writeFileSync(path.join(smokeDir,`${mode}-live.png`),(await win.webContents.capturePage()).toPNG());
+  await win.webContents.executeJavaScript(`gui.live_switch.checked=false;gui.live_switch.dispatchEvent(new Event('change'));`);
   rejectBackup(true);
   try {
     result.backupFailureNoWrite = await win.webContents.executeJavaScript(`(async () => {

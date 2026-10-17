@@ -64,36 +64,8 @@ test('missing or out-of-order response packets cannot produce a snapshot', async
   await assert.rejects(session.body(),/順番|欠け/);
 });
 
-const fixture50 = fs.readFileSync(path.join(__dirname,'fixtures/gp50-US-Lead.prst'));
-const capture50 = require('./fixtures/gp50_suite_write_slot0.json');
-test('all 29 GP-50 frames match the captured Suite import; model detection is exact', () => {
-  assert.deepEqual(C.writeFrames(fixture50,0,'gp50').map(C.hex),capture50.write);
-  assert.equal(C.parse(fixture50).profile.key,'gp50');
-  assert.throws(()=>C.writeFrames(fixture50,0,'gp5'));
-  assert.throws(()=>C.writeFrames(fixture,0,'gp50'));
-  const P = require('../app/device-profiles.js');
-  assert.equal(P.matchesName('gp5','Valeton GP-50 MIDI'),false);
-  assert.equal(P.matchesName('gp50','Valeton GP-5 MIDI'),false);
-  assert.equal(P.matchesName('gp5','Valeton GP-5 MIDI'),true);
-  assert.equal(P.matchesName('gp50','Valeton GP-50 MIDI'),true);
-});
-for (const chunk of [19,100]) test(`GP-50 model-specific session, ${chunk}-byte response chunks, Program Change reload and name16 preservation`, async()=>{
-  let session;
-  const fake = new Fake(fixture50,frame=>session.receive(frame),chunk);
-  session = new Session(frame=>fake.send(frame),300,'gp50');
-  const desired = C.build('Long Name ABCDEF',C.parse(fixture50).body,'gp50');
-  const result = await session.write(desired,4);
-  assert.equal(result.names[4],'Long Name ABCDEF');
-  assert.deepEqual(result.body,C.parse(desired).body);
-  assert.equal(fake.writes,1);
-  assert.equal(fake.sent.filter(p=>p.short?.[0]===0xc0).length,2);
-  const before=fake.sent.length;
-  await assert.rejects(session.write(fixture,4));
-  assert.equal(fake.sent.length,before);
-});
-test('GP-50 malformed records and wrong device tag are rejected before write',()=>{
-  for(const off of [57,81,160,218]) {
-    const b=Uint8Array.from(fixture50); if(off===218) new DataView(b.buffer).setFloat32(off,NaN,true); else b[off]=255; b[20]=C.crc8(b.slice(21));
-    assert.throws(()=>C.writeFrames(b,0,'gp50'));
-  }
+test('GP-50 files and device names are rejected',()=>{
+  const foreign=fs.readFileSync(path.join(__dirname,'fixtures/gp50-US-Lead.prst'));
+  assert.throws(()=>C.parse(foreign));
+  assert.equal(require('../app/device-profiles.js').matchesName('gp5','GP-50'),false);
 });

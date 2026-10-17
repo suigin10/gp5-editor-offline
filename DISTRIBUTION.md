@@ -1,4 +1,4 @@
-# 配布物の構成 — v0.3.0
+# 配布物の構成 — v0.4.0
 
 - Windows x64用ZIP: EXEとランタイム、README、謝辞、出典、ライセンス類
 - ソースZIP: Electronラッパー、編集済みページ、原作HTML、依存固定ファイル、ビルド手順
@@ -8,8 +8,8 @@
 
 ## 原作者への謝意と支援
 
-本アプリは **rvalladares氏のGP5 Editor / GP50 Editor** を基にした非公式のWindows移植版です。
-GP-5 / GP-50のエディターを開発・公開してくださった原作者に、心より感謝します。
+本アプリは **rvalladares氏のGP5 Editor** を基にした非公式のWindows移植版です。
+GP-5のエディターを開発・公開してくださった原作者に、心より感謝します。
 便利に使えたときは、原作者への感謝と寄付による支援も、ぜひお忘れなく（寄付は任意です）。
 
 - 原作・Bluetooth版: https://rvalladares.com/gp5/gp5editor/

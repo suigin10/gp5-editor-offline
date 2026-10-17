@@ -1,8 +1,8 @@
-// GP-5 / GP-50. Protocol facts and test vectors: see PROTOCOL_SOURCES.md.
+// GP-5. Protocol facts and test vectors: see PROTOCOL_SOURCES.md.
 (function (root) {
   'use strict';
   const profiles = typeof module !== 'undefined' && module.exports ? require('./device-profiles.js') : root.GPProfiles;
-  const header = key => Uint8Array.from((key === 'gp50' ? '47502d3530000000000000000000000000000100' : '47502d3500000000000000000000000000000100').match(/../g), h => parseInt(h,16));
+  const header = () => Uint8Array.from('47502d3500000000000000000000000000000100'.match(/../g), h => parseInt(h,16));
   const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
   const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   function crc8(bytes) {
@@ -33,13 +33,13 @@
   function parse(input, expectedKey) {
     const bytes = Uint8Array.from(input);
     const profile = Object.values(profiles.PROFILES).find(p => bytes.length === p.fileLength && eq(bytes.slice(0,20),header(p.key)));
-    if (!profile) throw Error('GP-5（507バイト）またはGP-50（552バイト）の.prstを選択してください。');
+    if (!profile) throw Error('GP-5用（507バイト）の.prstを選択してください。');
     if (expectedKey && profile.key !== expectedKey) throw Error(`${profile.name}のファイルを${profiles.get(expectedKey).name}には直接読み込めません。`);
     if (crc8(bytes.slice(21)) !== bytes[20]) throw Error('ファイルのチェックサムが一致しません。');
     if (!eq(bytes.slice(21,25),[255,255,255,255])) throw Error('プリセットのヘッダーが不正です。');
     const nameBytes = bytes.slice(25, 25 + profile.fileNameLength);
     if (nameBytes.some(b => b && (b < 32 || b > 126))) throw Error('未対応のパッチ名です。');
-    if (profile.key === 'gp5' && bytes.slice(35,41).some(b => b)) throw Error('GP-5の名前フィールドが不正です。');
+    if (bytes.slice(35,41).some(b => b)) throw Error('GP-5の名前フィールドが不正です。');
     const name = readName(nameBytes); nameField(name, profile.fileNameLength);
     const groups = records(bytes,41,bytes.length);
     const sizes = { 255:16, 0:16, 1:profile.settingsLength, 2:390, 3:profile.fsLength };
@@ -55,9 +55,8 @@
       if (value < min || value > max) throw Error('パッチ設定が範囲外です。');
       return rec.offset;
     }
-    const volumeOffset = setting(0x2001,profile.key === 'gp5' ? [4] : [1],0,100);
+    const volumeOffset = setting(0x2001,[4],0,100);
     setting(0x2002,[4],40,260);
-    if (profile.key === 'gp50') for (const [tag,len,max] of [[0x2003,1,1],[0x2004,4,100],[0x2005,4,100],[0x2006,1,1],[0x2007,1,100],[0x2008,1,100],[0x2009,1,10],[0x200a,1,7]]) setting(tag,[len],0,max);
     const toneGroup = groups.get(2), tone = records(bytes,toneGroup.offset,toneGroup.offset+toneGroup.length);
     for (const [tag,length] of [[0x3001,4],[0x3002,10],[0x3003,40],[0x3004,320]]) if (tone.get(tag)?.length !== length) throw Error('音色レコードが不正です。');
     const orderOffset = tone.get(0x3002).offset, modelsOffset = tone.get(0x3003).offset, paramsOffset = tone.get(0x3004).offset;

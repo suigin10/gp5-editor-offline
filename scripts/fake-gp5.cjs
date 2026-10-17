@@ -7,6 +7,8 @@
       this.current = 4; this.ram = this.flash[4].slice(41); this.deliver = deliver;
       this.blockSize = blockSize; this.sent = []; this.writes = 0; this.incoming = [];
       this.dropAt = -1;
+      this.rejectAt=-1;this.assetWrites=0;
+      this.tables={32:Array.from({length:20},(_,slot)=>({flag:1,name:`User IR ${slot+1}`})),36:Array.from({length:80},(_,slot)=>({flag:1,name:slot<50?`Factory${slot}`:'Empty'}))};
     }
     reply(payload) {
       const total = Math.ceil(payload.length / this.blockSize);
@@ -27,15 +29,21 @@
       if (!frame) throw Error('Test received corrupt frame');
       this.sent.push(frame);
       if (this.sent.length === this.dropAt) return;
+      if (this.sent.length === this.rejectAt) { this.reply([20,8,1]);return; }
       const p = frame.payload;
       if (frame.total > 1) {
         if (frame.index !== this.incoming.length) throw Error('Out of order write');
         this.incoming.push(p);
         if (this.incoming.length === frame.total) {
           const data = Uint8Array.from(this.incoming.flatMap(v => Array.from(v)));
-          if (data[0] !== 17 || data[1] !== 79) throw Error('Forbidden test opcode');
-          this.flash[data[2]] = C.build(C.readName(data.slice(6,22)), data.slice(22));
-          this.writes++; this.incoming = [];
+          if(data[0]===17&&[33,37].includes(data[1])) {
+            const ir=data[1]===33,slot=new DataView(data.buffer).getUint32(6,true)-(ir?0x0a100000:0x0f000000);
+            this.tables[ir?32:36][slot]={flag:0,name:C.readName(data.slice(10,26))};this.assetWrites++;this.assetData=data.slice(74);
+          }else{
+            if (data[0] !== 17 || data[1] !== 79) throw Error('Forbidden test opcode');
+            this.flash[data[2]] = C.build(C.readName(data.slice(6,22)), data.slice(22));this.writes++;
+          }
+          this.incoming = [];
         }
         this.reply([20,8,0]); return;
       }
@@ -46,6 +54,10 @@
           const names = [18,64];
           this.flash.forEach((b,i) => names.push(i,0,0,0,...b.slice(25,41)));
           this.reply(names);
+        } else if(this.tables[p[1]]) {
+          const entries=this.tables[p[1]],payload=[18,p[1],...entries.map(e=>e.flag)];
+          for(const entry of entries)payload.push(...Array.from(entry.name.padEnd(16,'\0'),c=>c.charCodeAt(0)));
+          this.reply(payload);
         } else throw Error('Unexpected query');
       } else if (p[0] === 17 && p[1] === 67) {
         if (p[2] !== this.current) { this.current = p[2]; this.ram = this.flash[this.current].slice(41); }

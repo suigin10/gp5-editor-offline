@@ -11,7 +11,7 @@ This is an unofficial desktop port, not endorsed by the original developer or Va
 No editor-wide modification/redistribution license was found on the retrieved pages.
 Original rights are retained. Attribution and donation do not grant redistribution rights.
 
-Changes in this port: Electron wrapper, GP-5 / GP-50 model selection, local assets,
+Changes in this port: Electron wrapper, GP-5 desktop controls, local assets,
 USB/Bluetooth selector, version branding, and a new application icon.
 The original website icon and donation banner are not included in the application.
 
@@ -28,8 +28,4 @@ MIT notices: COMMUNITY-PROTOCOL-LICENSE.txt. Details: PROTOCOL_SOURCES.md.
 These notices do not change the original rvalladares editor rights.
 
 
-0.3.0 adds rvalladares GP50 Editor USB/Bluetooth pages:
-https://rvalladares.com/gp5/gp50editor/
-Archived provenance: upstream/GP50-ORIGIN.json. Original editor rights are unchanged.
-GP-50 capture vectors: drewmerc302/valeton-gp50 patch/decode_import_capture.py (MIT, Andrew Mercurio).
-VLTN Tone Studio is GPL-3.0; consulted for protocol facts and verification status only, no code copied in this release. See FEATURE_REVIEW.md.
+0.4.0: GP-50 support removed. IR/SnapTone format facts consulted in VLTN Tone Studio (GPL-3.0); independently implemented here. No VLTN code, fixtures, converter engines or models bundled. See PROTOCOL_SOURCES.md.
