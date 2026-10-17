@@ -16,3 +16,8 @@ Thank you to rvalladares for developing and sharing GP5 Editor.
 If this port is useful to you, please consider supporting the original developer through the donation link above. Donations are optional.
 
 The offline desktop wrapper, application icon, GP-5-only UI and packaging are changes in this port; the original editor remains credited to rvalladares.
+
+
+## 0.2.0の通信資料
+
+GP-5の.prst構造・Suite通信記録を公開したfsanchezlme97-ui氏とAndrew Mercurio氏に感謝します。追加資料としてVLTN-Tone-Studioも参照しました。出典はPROTOCOL_SOURCES.md、同梱テスト資料のMIT通知はCOMMUNITY-PROTOCOL-LICENSE.txtをご覧ください。

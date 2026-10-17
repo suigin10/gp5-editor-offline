@@ -1,29 +1,25 @@
-# 0.1.2の検証結果 — 2026-10-17
+# 0.2.0の検証結果 — 2026-10-17
 
-- USB/Bluetooth両ページのオフライン表示と画像読込: 成功
-- 両画面のGP-50書き出し処理と不要UIを削除
-- GP-5プリセット書き出し: USB/BTとも原版とバイト一致（パッチ0/49/99の合成データ）
-- USB/Bluetooth切替位置と選択状態、削除対象DOMの不存在を確認
-- USB Web MIDI/SysEx権限とGP-5入出力ポートの列挙: 成功、ポートは閉じたまま
-- Bluetooth APIとアダプター検出: 利用可能
-- BLE機器選択画面: 合成機器で選択コールバックを確認
-- PCへのプリセット形式ファイル保存: 合成データのバイト一致を確認
-- 外部HTTP/HTTPS通信の遮断: 確認
-- パッケージしたEXEでの同じスモーク検証: 成功
+- GP-5のSuite実キャプチャ: 書き込み全26フレームとリネームをバイト単位で照合、成功。
+- 単体テスト8件: 成功。空白・短い名前・10文字名、破損/異機種/不正レコード/NaN/不正並び順/番号の拒否、USB19バイト・BLE100バイト応答、欠落/順序不正、ACKタイムアウト、切断を検証。
+- Electron内のUSB/Bluetooth両画面: 合成GP-5へのPC保存、読み込み、リネーム、自動同期、PCファイルのバイト一致、編集中/保存済み両バックアップ、バックアップ失敗時の書き込み中止、ダイアログ終了を確認。
+- 破損ファイルと確認キャンセル時の通信ゼロを確認。
+- 元のGP-5書き出し関数は原版との一致を維持。新PC保存は検証済みの共通codecとネイティブ保存ダイアログを使用。
+- オフライン表示、MIDI/SysEx権限、ポート列挙（閉じたまま）、BLE選択画面、外部通信遮断、バージョンとアイコンの既存スモークも成功。
 
-制限付き開発環境のため、通常のChromiumサンドボックス起動は拒否されました。
-スモーク検証のみ --no-sandbox --disable-gpu と、作業用TEMPを指定しました。
-配布アプリはsandbox: trueの設定で、これらのオプションは付属しません。
-通常のWindowsデスクトップ環境での起動は、ユーザーによる初回確認が必要です。
-Bluetoothの無線電源変更は開発環境で拒否されました。実機の探索・GATT接続は未検証です。
-GP-5への接続同期、編集、保存、NAM転送、ファームウェア更新は実行していません。
+新機能はシミュレーターで検証しています。実機への接続・パラメーター送信・保存・リネームは実行していません。特にBluetoothでのプリセット転送は実機未検証です。
+制限付き開発環境のため、スモーク起動だけ --no-sandbox --disable-gpu と作業用TEMPを指定しています。配布版は sandbox: true を維持します。
 
-実機での初回手順: Suiteを終了し、USBモードでConnectして表示同期を確認してください。
-Bluetoothは上部のBluetoothボタンから切り替え、本体のBluetoothを有効にしてConnectします。
+## 再現
 
-0.1.2では、ページのversionメタデータ、タイトル、ファビコン参照、EXEアイコンとバージョン情報を追加確認済みです。
+```powershell
+node scripts/check-gp5-export.cjs
+node --test scripts/test-presets.cjs
+$env:GP5_PATCH_TEST_ROOT = (Get-Location).Path
+npm run smoke
+```
 
-原作者: rvalladares / https://rvalladares.com/gp5/gp5editor/
-開発・公開に感謝します。任意の寄付: https://www.buymeacoffee.com/rvalladares
+拡張スモークは実ポートを開かず、USB/Bluetooth入出力を合成デバイスへ置き換えます。テスト用userDataとバックアップは指定のGP5_SMOKE_DIR内です。
+原作者rvalladares氏に感謝します。任意の寄付: https://www.buymeacoffee.com/rvalladares
 
-パッケージ版スモーク: 成功。FileVersion / ProductVersion: 0.1.2。
+パッケージ版EXEの拡張スモーク: USB/Bluetoothとも成功。FileVersion / ProductVersion: 0.2.0。名前変更ダイアログ中に対象パッチが変わった場合の送信ゼロも確認。

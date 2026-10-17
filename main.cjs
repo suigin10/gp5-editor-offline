@@ -1,4 +1,6 @@
-const { app, BrowserWindow, Menu, dialog, session } = require('electron');
+const { app, BrowserWindow, Menu, dialog, session, ipcMain, shell } = require('electron');
+const crypto = require('node:crypto');
+const presetCodec = require('./app/preset-codec.js');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -16,6 +18,7 @@ let win;
 let bluetoothPicker;
 let mode = 'usb';
 let smokeDownloadDone;
+let smokeRejectBackup = false;
 const failures = [];
 const blockedRequests = [];
 
@@ -32,6 +35,7 @@ function isEditor(contents) {
 
 async function switchMode(next) {
   if (mode === next) return;
+  if (await win.webContents.executeJavaScript('!!window.GP5Patches?.busy')) return;
   const connected = await win.webContents.executeJavaScript(mode === 'usb'
     ? 'typeof inputPort !== "undefined" && inputPort !== null'
     : 'typeof device !== "undefined" && !!device?.gatt?.connected');
@@ -85,7 +89,58 @@ app.whenReady().then(async () => {
     show: !smoke, backgroundColor: '#212529',
     icon: path.join(__dirname, 'app', 'assets', 'app-icon.ico'),
     title: appTitle,
-    webPreferences: { session: ses, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
+    webPreferences: { session: ses, preload: path.join(__dirname, 'editor-preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
+  });
+  const backupDir = path.join(app.getPath('userData'), 'patch-backups');
+  const checked = (event, bytes) => {
+    if (!isEditor(event.sender)) throw Error('Invalid editor');
+    if (!Array.isArray(bytes) || bytes.length !== 507 || bytes.some(b => !Number.isInteger(b) || b < 0 || b > 255)) throw Error('Invalid preset');
+    return Buffer.from(presetCodec.parse(bytes).bytes);
+  };
+  const safeName = value => String(value || 'GP5').replace(/[^A-Za-z0-9 _.-]/g, '_').slice(0, 80).replace(/[. ]+$/, '') || 'GP5';
+  function atomicSave(filename, bytes) {
+    const temp = `${filename}.${crypto.randomUUID()}.tmp`;
+    try {
+      fs.writeFileSync(temp, bytes, { flag: 'wx' });
+      fs.renameSync(temp, filename);
+      if (!fs.readFileSync(filename).equals(bytes)) throw Error('保存後のファイルが一致しません。');
+    } finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
+  }
+  ipcMain.handle('gp5-file-save', async (event, bytes, name) => {
+    const data = checked(event, bytes);
+    if (smoke) { atomicSave(path.join(smokeDir, `pc-${mode}.prst`), data); return `pc-${mode}.prst`; }
+    const result = await dialog.showSaveDialog(win, { title: 'パッチをPCに保存',
+      defaultPath: path.join(app.getPath('documents'), `${safeName(name)}.prst`),
+      filters: [{ name: 'GP-5 preset', extensions: ['prst'] }] });
+    if (result.canceled) return null;
+    atomicSave(result.filePath, data);
+    return path.basename(result.filePath);
+  });
+  ipcMain.handle('gp5-file-open', async event => {
+    if (!isEditor(event.sender)) throw Error('Invalid editor');
+    const result = await dialog.showOpenDialog(win, { title: 'GP-5パッチをPCから読み込み', properties: ['openFile'],
+      filters: [{ name: 'GP-5 preset', extensions: ['prst'] }] });
+    if (result.canceled) return null;
+    const filename = result.filePaths[0];
+    if (fs.statSync(filename).size !== 507) throw Error('GP-5用の507バイトの.prstファイルを選択してください。');
+    const bytes = presetCodec.parse(fs.readFileSync(filename)).bytes;
+    return { name: path.basename(filename), bytes: Array.from(bytes) };
+  });
+  ipcMain.handle('gp5-file-backup', (event, bytes, label) => {
+    const data = checked(event, bytes);
+    if (smoke && smokeRejectBackup) throw Error('テスト用: バックアップ保存失敗');
+    fs.mkdirSync(backupDir, { recursive: true });
+    const name = `${new Date().toISOString().replace(/[:.]/g, '-')}-${safeName(label)}-${crypto.randomUUID().slice(0,8)}.prst`;
+    const filename = path.join(backupDir, name);
+    fs.writeFileSync(filename, data, { flag: 'wx' });
+    if (!fs.readFileSync(filename).equals(data)) throw Error('バックアップを確認できません。処理を中止しました。');
+    return name;
+  });
+  ipcMain.handle('gp5-file-show-backups', async event => {
+    if (!isEditor(event.sender)) throw Error('Invalid editor');
+    fs.mkdirSync(backupDir, { recursive: true });
+    const error = await shell.openPath(backupDir);
+    if (error) throw Error(error);
   });
   win.webContents.on('will-navigate', (event, url) => {
     if (url.split('#')[0] === win.webContents.getURL().split('#')[0]) return;
@@ -149,6 +204,8 @@ app.whenReady().then(async () => {
     const completed = await Promise.race([downloadState, new Promise(resolve => setTimeout(() => resolve('timeout'), 4000))]);
     usb.presetDownloadState = completed;
     usb.presetDownloadPassed = completed === 'completed' && fs.readFileSync(path.join(smokeDir, 'synthetic.prst')).equals(Buffer.from([71,80,45,53,0]));
+    const patchTests = process.env.GP5_PATCH_TEST_ROOT ? require(path.join(process.env.GP5_PATCH_TEST_ROOT, 'scripts/patch-smoke.cjs')) : null;
+    if (patchTests) usb.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
     fs.writeFileSync(path.join(smokeDir, 'usb-window.png'), (await win.webContents.capturePage()).toPNG());
     await switchMode('bluetooth');
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -166,6 +223,7 @@ app.whenReady().then(async () => {
       result.adapterAvailable = await navigator.bluetooth.getAvailability();
       return result;
     })()`);
+    if (patchTests) bluetooth.patchTools = await patchTests(win, { root: process.env.GP5_PATCH_TEST_ROOT, mode, smokeDir, backupDir, rejectBackup: value => { smokeRejectBackup = value; } });
     fs.writeFileSync(path.join(smokeDir, 'bluetooth-window.png'), (await win.webContents.capturePage()).toPNG());
     // Exercise our native BLE picker using synthetic discovery results only.
     const { BrowserWindow: BW, ipcMain } = require('electron');

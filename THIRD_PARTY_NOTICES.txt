@@ -20,3 +20,10 @@ Bootstrap v5.3.8: Copyright 2011-2025 The Bootstrap Authors.
 MIT License: BOOTSTRAP-LICENSE.txt (unaltered).
 Electron: LICENSE (unaltered). Chromium: LICENSES.chromium.html (unaltered).
 These dependency licenses do not relicense the original editor.
+
+
+0.2.0 preset protocol references and two copied test fixtures:
+https://github.com/fsanchezlme97-ui/gp5-editor
+https://github.com/drewmerc302/valeton-gp50
+MIT notices: COMMUNITY-PROTOCOL-LICENSE.txt. Details: PROTOCOL_SOURCES.md.
+These notices do not change the original rvalladares editor rights.
