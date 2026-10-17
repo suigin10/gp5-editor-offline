@@ -25,7 +25,7 @@ const result = await packager({
   download: { cacheRoot }
 });
 for (const output of result) {
-  for (const file of ['README.txt', 'README.md', 'ACKNOWLEDGEMENTS.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.txt', 'DISTRIBUTION.md', 'VALIDATION.md', 'BOOTSTRAP-LICENSE.txt']) {
+  for (const file of ['README.txt', 'README.md', 'ACKNOWLEDGEMENTS.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.txt', 'DISTRIBUTION.md', 'VALIDATION.md', 'BOOTSTRAP-LICENSE.txt', 'COMMUNITY-PROTOCOL-LICENSE.txt', 'PROTOCOL_SOURCES.md']) {
     fs.copyFileSync(path.join(root, file), path.join(output, file));
   }
   fs.copyFileSync(path.join(root, 'upstream/ORIGIN.json'), path.join(output, 'ORIGIN.json'));
